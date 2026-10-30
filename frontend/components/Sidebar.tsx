@@ -66,7 +66,7 @@ export function Sidebar() {
       </div>
       <nav aria-label="Main" className="flex-1 space-y-0.5 p-2">
         {items.map(({ href, label, icon: Icon, group }, i) => {
-          const active = path === href || path.startsWith(href + "/");
+          const active = path === href || path.startsWith(href + "/") || (staticDemo && path === "/");
           const heading = group && group !== items[i - 1]?.group;
           return (
             <div key={href}>

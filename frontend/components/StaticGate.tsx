@@ -10,7 +10,7 @@ import { Button, EmptyState, PageHeader } from "./ui";
 /** In the hosted static demo only /showcase works; every other route explains why and points to the local app. */
 export function StaticGate({ children }: { children: ReactNode }) {
   const path = usePathname() || "/";
-  if (!isStaticDemo() || path === "/showcase" || path.startsWith("/showcase/")) return <>{children}</>;
+  if (!isStaticDemo() || path === "/" || path === "/showcase" || path.startsWith("/showcase/")) return <>{children}</>;
   return (
     <>
       <PageHeader eyebrow="Hosted static demo" title="This page needs the local backend" />

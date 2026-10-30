@@ -106,7 +106,7 @@ wetcor-ai/
 | [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) | Every table and field with units |
 | [docs/STORAGE.md](docs/STORAGE.md) | Database, file layout, hashing, migrations, deletion, trust boundary |
 | [docs/API.md](docs/API.md) | REST endpoints generated from the code (`docs/openapi.json`) |
-| [docs/NETLIFY.md](docs/NETLIFY.md) | Hosting the static showcase demo on Netlify (no backend) |
+| [docs/NETLIFY.md](docs/NETLIFY.md) | Hosting the static showcase demo on Netlify (plain static export, no backend) |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Diagnostics for common problems |
 | [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md) | Manual camera and potentiostat validation procedure |
 | [docs/TEST_REPORT.md](docs/TEST_REPORT.md) | Recorded test results |

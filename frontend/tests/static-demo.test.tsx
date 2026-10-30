@@ -63,3 +63,12 @@ describe("hosted static demo mode", () => {
     await waitFor(() => expect(f).toHaveBeenCalledTimes(1));
   });
 });
+
+describe("static demo root", () => {
+  it("shows the showcase (not the gate) at /", () => {
+    vi.stubEnv("NEXT_PUBLIC_STATIC_DEMO", "1");
+    nav.pathname = "/";
+    render(<StaticGate><div>showcase here</div></StaticGate>);
+    expect(screen.getByText("showcase here")).toBeInTheDocument();
+  });
+});

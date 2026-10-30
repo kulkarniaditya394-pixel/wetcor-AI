@@ -36,3 +36,5 @@ models/*
 
 # showcase example (public image + synthetic electrochemistry)
 !data/showcase/
+
+frontend/out/
