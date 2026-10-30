@@ -29,3 +29,26 @@ def reset(confirm: str = Query(...), db: Session = Depends(get_session)):
     if confirm != "RESET-DEMO":
         raise HTTPException(400, "Type RESET-DEMO to confirm. Only records flagged as demo are removed.")
     return demo.reset_demo(db, settings.models_dir)
+
+
+# ---------------- showcase (pre-computed example test) ----------------
+
+@router.get("/showcase")
+def showcase_status(db: Session = Depends(get_session)):
+    from app.services import showcase
+    try:
+        s = showcase.status(db)
+        return {"loaded": s is not None, "showcase": s, "manifest": showcase.manifest()}
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
+@router.post("/showcase/load")
+def showcase_load(db: Session = Depends(get_session)):
+    from app.services import showcase
+    try:
+        return showcase.load(db)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from None

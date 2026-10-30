@@ -16,6 +16,7 @@ SQLite database and local files. No cloud API, no online AI service and no uploa
 
 | Area | Function |
 |---|---|
+| **Showcase** | One complete, pre-computed test to open during a presentation: inputs, a real goniometer frame analysed by WETCOR AI next to the instrument's own reading, OCP and polarisation results with formulas. Loaded on request; see `data/showcase/README.md` (image licence and how to swap in your own steel-plate test). |
 | **Overview** | Counts, data completeness, recent experiments and activity, all computed from the local database. Demo data are counted separately. |
 | **Wettability Lab** | USB-camera preview (`getUserMedia`), device and resolution selection, **Capture & Analyse**, OpenCV sessile-drop analysis (baseline, contact points, sub-pixel boundary, local-tangent and spherical-cap fits), draggable baseline/contact/tangent handles, ROI, manual tangent mode, quality diagnostics, 90° classification, traceable saving. Image upload works when no camera is connected. |
 | **Corrosion Lab** | Drag-and-drop import of CSV/TSV/TXT potentiostat exports, preview, explicit method selection (OCP, LPR, potentiodynamic polarisation, EIS), column and **unit** mapping, validation, plots, analysis with documented formulas, re-analysis history, raw and processed downloads. |
@@ -47,6 +48,7 @@ access. Stop everything with `.\stop-local.ps1`.
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once. Options: `run-local.ps1 -BackendPort 8200 -FrontendPort 3200`,
 `run-local.ps1 -Dev` (hot-reload development server).
 
+For a presentation, open **Showcase → Load showcase example** once; afterwards the finished test opens instantly.
 No laboratory data yet? *Settings → Load demo data* creates 10 synthetic specimens with images, OCP/LPR/
 polarisation/EIS runs and analyses. Synthetic sample files for the import wizard and image upload are in
 `data/demo/`.

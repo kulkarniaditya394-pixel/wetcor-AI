@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainCircuit, Database, Droplets, FileText, Gauge, Settings, Zap } from "lucide-react";
+import { BrainCircuit, Database, Droplets, FileText, Gauge, Presentation, Settings, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ import { cx } from "./ui";
 
 export const NAV = [
   { href: "/dashboard", label: "Overview", icon: Gauge, group: "" },
+  { href: "/showcase", label: "Showcase", icon: Presentation, group: "" },
   { href: "/wettability", label: "Wettability Lab", icon: Droplets, group: "Instruments" },
   { href: "/corrosion", label: "Corrosion Lab", icon: Zap, group: "Instruments" },
   { href: "/experiments", label: "Experiments", icon: Database, group: "Data" },

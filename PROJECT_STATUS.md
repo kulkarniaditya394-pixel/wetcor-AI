@@ -1,13 +1,14 @@
 # PROJECT STATUS — WETCOR AI 1.0.0 (2026-10-30)
 
 ## Implemented
-* **Backend** (FastAPI, SQLAlchemy/SQLite, OpenCV, SciPy, scikit-learn): 48 REST operations (docs/API.md).
+* **Backend** (FastAPI, SQLAlchemy/SQLite, OpenCV, SciPy, scikit-learn): 50 REST operations (docs/API.md).
 * **Wettability Lab**: camera selection/preview/capture, image upload, geometric contact-angle engine (auto baseline, sub-pixel boundary, rotated-frame local tangent, spherical-cap fit, diagnostics, waist/reflection warning), ROI, draggable/keyboard handles, manual tangent mode, `manual_corrected` with automatic result preserved, re-analysis history, rejection with reason, overlay export.
 * **Corrosion Lab**: CSV/TSV/TXT parser (encodings, delimiters, decimal comma, Gamry unit rows, metadata), import wizard with explicit units, OCP / LPR / Tafel / EIS analyses with validity flags, Stern–Geary and material-property provenance, CR formula, superseded-analysis history, raw + processed downloads.
 * **Experiment database**: specimens, experiments, artifacts with SHA-256, audit log, search/sort/filter/pagination, guarded deletion to trash, versioned migrations with backup.
 * **ML Studio**: readiness policy, five configurations on identical specimen-grouped folds, leakage guard, out-of-fold metrics, paired comparison with conservative interpretation, persisted hash-checked models, predictions with domain warnings.
 * **Reports**: print-ready experiment and ML reports (matplotlib SVG), 8 CSV exports.
 * **Frontend**: Next.js 16 / React 19 / Tailwind 4 dark instrument UI; research-status dashboard; grouped navigation; empty, loading, warning and error states throughout; origin badges (Measured / Calculated / Predicted / Demo); responsive to 375 px.
+* **Showcase example** (`/showcase`, `data/showcase/`): pre-computed presentation test — public goniometer frame (CC BY-SA 4.0, stand-in for steel; WETCOR 111.2° vs instrument 114.6°) + synthetic OCP/polarisation, built by the normal analysis code from an editable manifest.
 * **Demo workspace** (explicit load/reset) and `data/demo` synthetic sample files.
 * **Windows scripts**: setup, run (health-checked, auto-rebuild), stop (own processes only).
 
@@ -15,12 +16,13 @@
 `setup-windows.ps1` · `run-local.ps1` (prod and `-Dev`) · `stop-local.ps1` · `pytest backend/tests` · `npm test` · `npm run typecheck` · `next build` · `scripts/generate_demo_files.py` · `scripts/export_api_docs.py`.
 
 ## Results
-* Backend tests: **82 passed, 0 failed**. Frontend tests: **23 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
+* Backend tests: **83 passed, 0 failed**. Frontend tests: **24 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
 * Setup, start and stop scripts verified on this machine (stop script bug found and fixed: it previously failed to match the backend command line).
 * Details: docs/TEST_REPORT.md.
 
 ## Not tested / limitations
 * **No real hardware was tested**: no USB camera (blocked in the test browser) and no real potentiostat files. Follow docs/HARDWARE_VALIDATION.md before relying on results.
+* Showcase image is not on steel (no openly licensed side-view droplet-on-steel image exists); replace it with your own capture.
 * Contact-angle accuracy is demonstrated only on synthetic silhouettes (≤ 0.5° for 20–150°); real-world accuracy is unknown until calibrated.
 * Automatic baseline needs the opaque specimen visible on both sides of the ROI; tilted-camera reflections need a manual baseline.
 * No Young–Laplace (axisymmetric drop shape) fitting; large, gravity-flattened drops rely on the local-tangent method.

@@ -21,7 +21,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow }: { title: strin
 
 export function Card({ title, actions, children, className, pad = true }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; pad?: boolean }) {
   return (
-    <section className={cx("rounded-lg border border-line bg-panel", className)}>
+    <section className={cx("min-w-0 rounded-lg border border-line bg-panel", className)}>
       {(title || actions) && (
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
           <h2 className="text-[13px] font-semibold uppercase tracking-wider text-ink-2">{title}</h2>

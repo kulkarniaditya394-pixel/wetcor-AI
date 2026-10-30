@@ -9,10 +9,11 @@ Recorded 2026-10-30 on Windows 11, Python 3.11.15, Node 24.17.0. All fixtures ar
 | Backend: ML | `pytest backend/tests/test_ml.py` | 10 passed |
 | Backend: database / migrations | `pytest backend/tests/test_database.py` | 4 passed |
 | Backend: API integration flows | `pytest backend/tests/test_api.py` | 13 passed |
-| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **82 passed, 0 failed** |
-| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **23 passed, 0 failed** |
+| Backend: showcase example | `pytest backend/tests/test_showcase.py` | 1 passed |
+| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **83 passed, 0 failed** |
+| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **24 passed, 0 failed** |
 | Frontend typecheck | `npm run typecheck` | passed |
-| Frontend production build | `npm run build` (Next.js 16.4.2) | passed, 13 routes |
+| Frontend production build | `npm run build` (Next.js 16.4.2) | passed, 14 routes |
 | Windows setup | `setup-windows.ps1` | completed (venv, pip, npm ci, DB init, build) |
 | Start / stop | `run-local.ps1`, `stop-local.ps1` | health-checked start; stop leaves 0 WETCOR processes |
 
@@ -31,3 +32,6 @@ Specimen and experiment creation; canvas-drawn 75° droplet uploaded → 75.0° 
 * Real USB camera (the in-app browser blocks camera access; the denied state was observed). See HARDWARE_VALIDATION.md.
 * Real potentiostat exports from the project's instrument.
 * Playwright end-to-end tests (component tests + manual browser run used instead).
+
+## Showcase example
+Loaded from the UI and checked in the browser: inputs, source frame with attribution, WETCOR overlay, 111.2° (L 112.6°, R 109.9°, `manual_corrected`, automatic attempt failed on the mirror reflection) vs the instrument's own 114.6°, OCP and Tafel results (i_corr 7.82 µA/cm² vs synthetic truth 8). No horizontal overflow at 1024 px.

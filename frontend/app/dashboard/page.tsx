@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BrainCircuit, Camera, Database, Droplets, FileUp, Plus, Settings2, Zap } from "lucide-react";
+import { ArrowRight, BrainCircuit, Camera, Database, Droplets, FileUp, Plus, Presentation, Settings2, Zap } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Alert, Badge, Button, Card, DemoBadge, EmptyState, PageHeader, Spinner, Stat, cx } from "@/components/ui";
@@ -65,6 +65,7 @@ export default function Dashboard() {
     <>
       <Link href="/wettability"><Button variant="primary" icon={<Camera className="size-4" />}>Capture contact angle</Button></Link>
       <Link href="/corrosion"><Button icon={<FileUp className="size-4" />}>Import corrosion data</Button></Link>
+      <Link href="/showcase"><Button variant="ghost" icon={<Presentation className="size-4" />}>Showcase example</Button></Link>
     </>
   );
   const ic = sum.data?.targets.i_corr;

@@ -1,0 +1,71 @@
+{
+  "title": "Showcase: wettability and corrosion of a steel specimen",
+  "summary": "A complete, pre-computed WETCOR AI test for demonstrations. The contact angle is measured by WETCOR AI on a real sessile-drop frame from a commercial goniometer (public image). The electrochemical runs are SYNTHETIC curves for a steel-like specimen. Replace the files and this manifest with your own steel-plate test to make the showcase yours.",
+  "specimen": {
+    "code": "DEMO-SHOWCASE-01",
+    "material": "Mild steel (showcase)",
+    "surface_preparation": "Ground to 600 grit, degreased (showcase values)",
+    "dimensions": "50 x 25 x 2 mm",
+    "exposed_area_cm2": 1.0,
+    "roughness_ra_um": 0.45,
+    "notes": "Showcase specimen. Contact-angle image is a public stand-in frame (substrate not documented by its author); electrochemical data are synthetic."
+  },
+  "experiment": {
+    "code": "DEMO-SHOWCASE-E01",
+    "experiment_type": "combined",
+    "operator": "WETCOR AI showcase",
+    "electrolyte": "NaCl",
+    "concentration_value": 3.5,
+    "concentration_unit": "wt%",
+    "temperature_c": 25.0,
+    "instrument": "Goniometer frame: Attension Theta (public image). Electrochemistry: synthetic generator.",
+    "reference_electrode": "SCE",
+    "procedure": "Sessile drop of deionised water, back-lit side view; OCP 30 min then potentiodynamic polarisation +/-300 mV vs E_corr at 1 mV steps (synthetic)."
+  },
+  "contact_angle": {
+    "image": "droplet_for_analysis.png",
+    "source_image": "source_attension_theta_frame.png",
+    "source": {
+      "title": "Contact angle measurement with Attension Theta",
+      "author": "Jyrkorpela",
+      "url": "https://commons.wikimedia.org/wiki/File:Contact_angle_measurement_with_Attension_Theta.png",
+      "licence": "CC BY-SA 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "substrate": "not documented by the author (used here as a stand-in for a steel plate)"
+    },
+    "preprocessing": [
+      "Cropped to the camera viewport (x 95-610, y 28-378 px of the 961 x 542 screenshot).",
+      "Third-party orange overlay (angle labels, baseline, volume text) removed by OpenCV Telea inpainting of 1800 px; nothing else altered. Script: scripts/prepare_showcase_image.py."
+    ],
+    "liquid": "Deionised water",
+    "droplet_volume_ul": 5.43,
+    "params": {
+      "mode": "auto",
+      "roi": [60, 110, 400, 220],
+      "baseline": [[0, 299], [514, 299]]
+    },
+    "correction_reason": "Automatic baseline detection fails because the reflective surface mirrors the drop; the baseline was placed on the mirror axis (narrowest row, y = 299 px) between the drop and its reflection.",
+    "reference": {
+      "source": "Reading of the instrument's own software visible in the original frame (Young-Laplace fit)",
+      "left_deg": 114.95,
+      "right_deg": 114.29
+    }
+  },
+  "corrosion_runs": [
+    {
+      "file": "ocp_SYNTHETIC.csv",
+      "method": "ocp",
+      "mapping": {"time": "Time (s)", "potential": "Potential (V vs SCE)"},
+      "units": {"time": "s", "potential": "V"},
+      "params": {"t_start_s": 1500, "t_end_s": 1800}
+    },
+    {
+      "file": "polarisation_SYNTHETIC.txt",
+      "method": "pdp",
+      "mapping": {"time": "T", "potential": "Vf", "current": "Im"},
+      "units": {"time": "s", "potential": "V", "current": "A"},
+      "params": {"anodic_mV": [70, 220], "cathodic_mV": [70, 220]},
+      "material_profile": "Fe"
+    }
+  ]
+}

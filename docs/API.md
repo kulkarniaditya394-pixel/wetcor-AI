@@ -86,6 +86,8 @@ All endpoints are served on the loopback interface only. Errors are JSON `{"deta
 | `GET` | `/api/demo` | Status |  |  |
 | `DELETE` | `/api/demo` | Reset | `confirm`* |  |
 | `POST` | `/api/demo/load` | Load |  |  |
+| `GET` | `/api/demo/showcase` | Showcase Status |  |  |
+| `POST` | `/api/demo/showcase/load` | Showcase Load |  |  |
 
 ## Schemas
 

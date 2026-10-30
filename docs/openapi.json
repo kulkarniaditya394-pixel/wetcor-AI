@@ -2108,6 +2108,44 @@
           }
         }
       }
+    },
+    "/api/demo/showcase": {
+      "get": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Showcase Status",
+        "operationId": "showcase_status_api_demo_showcase_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/showcase/load": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Showcase Load",
+        "operationId": "showcase_load_api_demo_showcase_load_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

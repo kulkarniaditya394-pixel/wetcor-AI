@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const health = useBackendHealth(10000);
   const version = useApi<Record<string, string>>("/api/version");
   const s = useApi<SettingsResp>("/api/settings");
-  const demo = useApi<{ specimens: number; contact_angle_runs: number; corrosion_runs: number }>("/api/demo");
+  const demo = useApi<{ specimens: number; contact_angle_runs: number; corrosion_runs: number; workspace_loaded: boolean }>("/api/demo");
   const [vals, setVals] = useState<Record<string, Record<string, string>>>({});
   const [msg, setMsg] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -61,14 +61,16 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-3 text-sm">
                 <p className="text-ink-2">Loads 10 synthetic specimens with generated droplet images, OCP/LPR/polarisation/EIS files and analyses so every screen can be exercised before laboratory data exist.
                   Synthetic corrosion parameters are drawn independently of the synthetic contact angles: the demo cannot show a real relationship. Demo records are excluded from real counts, datasets and reports unless explicitly included.</p>
+                <p className="text-ink-2">A single pre-computed presentation example is available on the <a className="text-accent underline" href="/showcase">Showcase</a> page; reset also removes it.</p>
                 <div>Currently loaded: <strong>{demo.data.specimens}</strong> specimens, {demo.data.contact_angle_runs} contact-angle runs, {demo.data.corrosion_runs} electrochemical runs.</div>
-                {demo.data.specimens === 0 ? (
+                {!demo.data.workspace_loaded && (
                   <Button variant="secondary" busy={busy === "load"} onClick={async () => {
                     setBusy("load");
                     try { await api("/api/demo/load", { method: "POST" }); setMsg({ tone: "good", text: "Demo workspace loaded (DEMO — SYNTHETIC DATA)." }); demo.reload(); }
                     catch (e) { setMsg({ tone: "bad", text: (e as Error).message }); } finally { setBusy(null); }
                   }}>Load demo data</Button>
-                ) : (
+                )}
+                {demo.data.specimens > 0 && (
                   <div className="flex flex-col gap-2 rounded-md border border-warn/40 p-3">
                     <label htmlFor="reset" className="text-xs text-muted">Reset removes only records flagged as demo. Type <code>RESET-DEMO</code>.</label>
                     <div className="flex gap-2">
@@ -94,8 +96,8 @@ export default function SettingsPage() {
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">{SECTION[sec as keyof typeof SECTION] ?? sec}</h3>
                   <div className="flex flex-col divide-y divide-line rounded-md border border-line">
                     {Object.entries(items).map(([k, meta]) => (
-                      <div key={k} className="grid items-center gap-2 px-3 py-2 sm:grid-cols-[1fr_140px]">
-                        <label htmlFor={`${sec}-${k}`} className="text-sm"><code className="text-ink">{k}</code><span className="block text-xs text-muted">{meta.description} (default {String(meta.default)})</span></label>
+                      <div key={k} className="grid items-center gap-2 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_140px]">
+                        <label htmlFor={`${sec}-${k}`} className="min-w-0 break-words text-sm"><code className="text-ink">{k}</code><span className="block text-xs text-muted">{meta.description} (default {String(meta.default)})</span></label>
                         {k === "primary_method" ? (
                           <Select id={`${sec}-${k}`} value={vals[sec]?.[k] ?? ""} onChange={(e) => setVals({ ...vals, [sec]: { ...vals[sec], [k]: e.target.value } })}>
                             <option value="polynomial">polynomial</option><option value="circle">circle</option>

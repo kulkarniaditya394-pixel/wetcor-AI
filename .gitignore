@@ -33,3 +33,6 @@ models/*
 # Runtime
 .run/
 *.log
+
+# showcase example (public image + synthetic electrochemistry)
+!data/showcase/

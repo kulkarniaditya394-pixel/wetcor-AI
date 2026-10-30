@@ -37,15 +37,58 @@ def _limits(db: Session) -> dict:
 def demo_status(db: Session) -> dict:
     return {"specimens": len(db.scalars(select(Specimen.id).where(Specimen.is_demo.is_(True))).all()),
             "contact_angle_runs": len(db.scalars(select(ContactAngleRun.id).where(ContactAngleRun.is_demo.is_(True))).all()),
-            "corrosion_runs": len(db.scalars(select(CorrosionRun.id).where(CorrosionRun.is_demo.is_(True))).all())}
+            "corrosion_runs": len(db.scalars(select(CorrosionRun.id).where(CorrosionRun.is_demo.is_(True))).all()),
+            "workspace_loaded": db.scalar(select(Specimen.id).where(Specimen.code == "DEMO-S01")) is not None}
 
 
-def load_demo(db: Session, n_specimens: int = 10, seed: int = 7) -> dict:
-    if demo_status(db)["specimens"]:
-        raise ValueError("Demo workspace already loaded. Reset it first.")
+DIAG_KEYS = ("status", "diagnostics", "methods", "geometry", "limits", "params", "lr_diff_deg", "classification", "errors", "uncertainty_note", "fit_method", "image")
+
+
+def add_ca_run(db: Session, data: bytes, filename: str, params: dict, lim: dict, spec: Specimen, exp: Experiment, notes: str,
+               subdir: str = "demo/images", **fields) -> ContactAngleRun:
+    """Analyse an image exactly as the save endpoint does and store it as a demo-flagged run (automatic result kept if corrected)."""
+    res = clean(analyze_ca(data, params, lim["wettability"]))
+    auto = clean(analyze_ca(data, {k: v for k, v in params.items() if k == "roi"}, lim["wettability"])) if res.get("manual_correction") else None
+    raw = store_artifact(db, data, kind="raw_image", subdir=subdir, original_filename=filename, content_type="image/png",
+                         specimen_id=spec.id, experiment_id=exp.id, is_demo=True)
+    ov = store_artifact(db, render_overlay(data, res), kind="overlay_image", subdir="demo/overlays", original_filename=f"overlay_{raw.sha256[:12]}.png",
+                        content_type="image/png", specimen_id=spec.id, experiment_id=exp.id, is_demo=True)
+    run = ContactAngleRun(specimen_id=spec.id, experiment_id=exp.id, image_artifact_id=raw.id, overlay_artifact_id=ov.id, method=res["method"] or "auto_failed",
+                          status="accepted" if res["mean_deg"] is not None else "rejected", left_deg=res["left_deg"], right_deg=res["right_deg"],
+                          mean_deg=res["mean_deg"], classification=(res["classification"] or {}).get("label"), analysis_params=params,
+                          diagnostics={k: res.get(k) for k in DIAG_KEYS}, warnings=res["warnings"], auto_result=auto, algorithm_version=res["algorithm_version"],
+                          notes=notes, is_demo=True, rejection_reason=None if res["mean_deg"] is not None else "automatic analysis failed", **fields)
+    db.add(run)
+    db.flush()
+    return run
+
+
+def add_corrosion_run(db: Session, data: bytes, name: str, method: str, spec: Specimen, exp: Experiment, lim: dict, params: dict,
+                      material: dict | None, notes: str, mapping: dict | None = None, units: dict | None = None) -> CorrosionRun:
+    """Import + analyse a synthetic file through the same code paths as the API, flagged as demo."""
     from app.api.corrosion import _store_run  # local import avoids a router import cycle
     from app.schemas.models import ImportMeta
 
+    t = parse_table(data)
+    s = suggest_mapping(t.columns, t.units_row, t.data)
+    meta = ImportMeta(method=method, mapping=mapping or s["mapping"], units=units or s["units"], imag_convention=s["imag_convention"], specimen_id=spec.id,
+                      experiment_id=exp.id, exposed_area_cm2=spec.exposed_area_cm2, area_source="specimen record", reference_electrode=exp.reference_electrode, notes=notes)
+    df, warnings = A.build_dataset(t, method, meta.mapping, meta.units, imag_convention=meta.imag_convention, area_cm2=spec.exposed_area_cm2)
+    run = db.get(CorrosionRun, _store_run(db, data, name, t, df, warnings, meta, spec, exp, spec.exposed_area_cm2, "specimen record", is_demo=True)["id"])
+    res = clean(A.analyze(method, df, params, lim["electrochemistry"], area_cm2=spec.exposed_area_cm2, reference_electrode=exp.reference_electrode, material=material))
+    rec = CorrosionAnalysis(corrosion_run_id=run.id, method=method, method_version=res["method_version"], params=params,
+                            result={k: v for k, v in res.items() if k != "metrics"}, status=res["status"])
+    db.add(rec)
+    db.flush()
+    for mt in res["metrics"]:
+        db.add(DerivedMetric(corrosion_run_id=run.id, analysis_id=rec.id, method_version=res["method_version"], **mt))
+    run.analysis_status = {"ok": "analysed", "limited": "analysis_limited", "invalid": "analysis_invalid"}[res["status"]]
+    return run
+
+
+def load_demo(db: Session, n_specimens: int = 10, seed: int = 7) -> dict:
+    if db.scalar(select(Specimen.id).where(Specimen.code == "DEMO-S01")):
+        raise ValueError("Demo workspace already loaded. Reset it first.")
     rng = np.random.default_rng(seed)
     lim = _limits(db)
     for k in range(n_specimens):
@@ -63,18 +106,7 @@ def load_demo(db: Session, n_specimens: int = 10, seed: int = 7) -> dict:
         theta = float(rng.uniform(45, 135))
         for rep in range(2):
             img, _ = synthetic_drop(theta + float(rng.normal(0, 2)), size=(640, 480), radius_px=float(rng.uniform(110, 150)), seed=int(rng.integers(1e6)))
-            data = encode_png(img)
-            res = clean(analyze_ca(data, {}, lim["wettability"]))
-            raw = store_artifact(db, data, kind="raw_image", subdir="demo/images", original_filename=f"DEMO_SYNTHETIC_{spec.code}_{rep + 1}.png",
-                                 content_type="image/png", specimen_id=spec.id, experiment_id=exp.id, is_demo=True)
-            ov = store_artifact(db, render_overlay(data, res), kind="overlay_image", subdir="demo/overlays", original_filename=f"overlay_{raw.sha256[:12]}.png",
-                                content_type="image/png", specimen_id=spec.id, experiment_id=exp.id, is_demo=True)
-            db.add(ContactAngleRun(specimen_id=spec.id, experiment_id=exp.id, image_artifact_id=raw.id, overlay_artifact_id=ov.id, method=res["method"] or "auto_failed",
-                                   status="accepted" if res["mean_deg"] is not None else "rejected", left_deg=res["left_deg"], right_deg=res["right_deg"],
-                                   mean_deg=res["mean_deg"], classification=(res["classification"] or {}).get("label"), analysis_params={},
-                                   diagnostics={k2: res.get(k2) for k2 in ("status", "diagnostics", "methods", "geometry", "limits", "params", "lr_diff_deg", "classification", "errors", "uncertainty_note", "fit_method", "image")},
-                                   warnings=res["warnings"], algorithm_version=res["algorithm_version"], notes=DEMO_TAG, is_demo=True,
-                                   rejection_reason=None if res["mean_deg"] is not None else "automatic analysis failed"))
+            add_ca_run(db, encode_png(img), f"DEMO_SYNTHETIC_{spec.code}_{rep + 1}.png", {}, lim, spec, exp, DEMO_TAG)
         icorr = float(10 ** rng.uniform(np.log10(0.5e-6), np.log10(20e-6)))  # independent of theta by construction
         files = [("pdp", ES.pdp_tsv(e_corr=float(rng.uniform(-0.75, -0.55)), icorr=icorr, beta_a=float(rng.uniform(0.05, 0.09)),
                                     beta_c=float(rng.uniform(0.10, 0.16)), seed=int(rng.integers(1e6))), f"DEMO_SYNTHETIC_{spec.code}_pdp.txt")]
@@ -82,23 +114,9 @@ def load_demo(db: Session, n_specimens: int = 10, seed: int = 7) -> dict:
             files += [("ocp", ES.ocp_csv(), f"DEMO_SYNTHETIC_{spec.code}_ocp.csv"), ("lpr", ES.lpr_csv(icorr=icorr), f"DEMO_SYNTHETIC_{spec.code}_lpr.csv"),
                       ("eis", ES.eis_semicolon(), f"DEMO_SYNTHETIC_{spec.code}_eis.csv")]
         for method, data, name in files:
-            t = parse_table(data)
-            s = suggest_mapping(t.columns, t.units_row, t.data)
-            meta = ImportMeta(method=method, mapping=s["mapping"], units=s["units"], imag_convention=s["imag_convention"], specimen_id=spec.id,
-                              experiment_id=exp.id, exposed_area_cm2=1.0, area_source="synthetic generator", reference_electrode="SCE", notes=DEMO_TAG)
-            df, warnings = A.build_dataset(t, method, meta.mapping, meta.units, imag_convention=meta.imag_convention, area_cm2=1.0)
-            out = _store_run(db, data, name, t, df, warnings, meta, spec, exp, 1.0, "synthetic generator", is_demo=True)
-            run = db.get(CorrosionRun, out["id"])
             params = {"anodic_mV": [70, 220], "cathodic_mV": [70, 220]} if method == "pdp" else {}
             material = {**MAT.profile(profile), "is_alloy": False} if profile else None
-            res = clean(A.analyze(method, df, params, lim["electrochemistry"], area_cm2=1.0, reference_electrode="SCE", material=material))
-            rec = CorrosionAnalysis(corrosion_run_id=run.id, method=method, method_version=res["method_version"], params=params,
-                                    result={k2: v for k2, v in res.items() if k2 != "metrics"}, status=res["status"])
-            db.add(rec)
-            db.flush()
-            for mt in res["metrics"]:
-                db.add(DerivedMetric(corrosion_run_id=run.id, analysis_id=rec.id, method_version=res["method_version"], **mt))
-            run.analysis_status = {"ok": "analysed", "limited": "analysis_limited", "invalid": "analysis_invalid"}[res["status"]]
+            add_corrosion_run(db, data, name, method, spec, exp, lim, params, material, DEMO_TAG)
     audit(db, "demo", "workspace", "load", f"{DEMO_TAG}: demo workspace loaded ({n_specimens} synthetic specimens)")
     db.commit()
     return demo_status(db)
