@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+backend/.venv/
+.venv/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/*.tsbuildinfo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+
+# Experimental data, databases and generated artefacts (never commit laboratory data)
+data/*
+!data/demo/
+data/demo/*
+!data/demo/README.txt
+!data/demo/DEMO_SYNTHETIC_*
+models/*
+!models/README.md
+*.sqlite3
+*.db
+*.joblib
+
+# Runtime
+.run/
+*.log
