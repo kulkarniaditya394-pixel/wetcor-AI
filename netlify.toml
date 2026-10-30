@@ -1,0 +1,14 @@
+# Netlify: hosts the static demo of WETCOR AI (the pre-computed Showcase only).
+# The Python backend cannot run on Netlify; the full app runs locally (see README.md).
+# In Netlify: connect the GitHub repo, leave all build settings as read from this file.
+
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Switches the frontend to hosted static-demo mode (no backend calls; /showcase only).
+  NEXT_PUBLIC_STATIC_DEMO = "1"

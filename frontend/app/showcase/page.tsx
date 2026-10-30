@@ -5,19 +5,11 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { CorrosionPlots, type RunData } from "@/components/CorrosionPlots";
 import { Alert, Badge, Button, Card, DemoBanner, EmptyState, KV, OriginBadge, PageHeader, Spinner, StatusDot, Table } from "@/components/ui";
-import { useApi } from "@/hooks/useApi";
-import { api, apiUrl, type CARun, type CorrosionRun, type Diagnostic, type Experiment, type Metric, type Specimen } from "@/lib/api";
+import { api, type Diagnostic, type Metric } from "@/lib/api";
+import { REPO_URL } from "@/lib/mode";
 import { fmtDeg, fmtNum, unit } from "@/lib/format";
+import { useShowcase } from "@/hooks/useShowcase";
 import { CA_NOTE, classTone } from "@/lib/wettability";
-
-type Manifest = {
-  title: string; summary: string;
-  contact_angle: { source: { title: string; author: string; url: string; licence: string; licence_url: string; substrate: string }; preprocessing: string[];
-    correction_reason: string; reference: { source: string; left_deg: number; right_deg: number } };
-};
-type Status = { loaded: boolean; manifest: Manifest; showcase: { specimen_id: number; experiment_id: number; contact_angle_run_ids: number[]; corrosion_runs: { id: number; method: string }[] } | null };
-type SpecDetail = { specimen: Specimen; experiments: Experiment[]; artifacts: { id: number; kind: string; original_filename: string; sha256: string }[] };
-type RunDetail = CorrosionRun & { metrics: Metric[]; current_analysis: { fit?: Record<string, unknown>; notes: string[]; warnings: string[] } | null; raw_file: { sha256: string; original_filename: string } };
 
 function Section({ n, title, origin, children }: { n: number; title: string; origin?: ReactNode; children: ReactNode }) {
   return (
@@ -50,19 +42,11 @@ function MetricTable({ metrics, names }: { metrics: Metric[]; names: string[] })
 }
 
 export default function ShowcasePage() {
-  const st = useApi<Status>("/api/demo/showcase");
+  const { staticMode, status: st, spec, ca, pdp, pdpData, ocp, ocpData, sourceImg, overlayImg, reportUrl, ids } = useShowcase();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const sc = st.data?.showcase;
-  const caId = sc?.contact_angle_run_ids[0];
-  const pdpId = sc?.corrosion_runs.find((r) => r.method === "pdp")?.id;
-  const ocpId = sc?.corrosion_runs.find((r) => r.method === "ocp")?.id;
-  const spec = useApi<SpecDetail>(sc ? `/api/specimens/${sc.specimen_id}` : null);
-  const ca = useApi<CARun>(caId ? `/api/wettability/measurements/${caId}` : null);
-  const pdp = useApi<RunDetail>(pdpId ? `/api/corrosion/runs/${pdpId}` : null);
-  const pdpData = useApi<RunData>(pdpId ? `/api/corrosion/runs/${pdpId}/data` : null);
-  const ocp = useApi<RunDetail>(ocpId ? `/api/corrosion/runs/${ocpId}` : null);
-  const ocpData = useApi<RunData>(ocpId ? `/api/corrosion/runs/${ocpId}/data` : null);
+  const { caId, pdpId } = ids;
 
   const load = async () => {
     setBusy(true);
@@ -83,8 +67,8 @@ export default function ShowcasePage() {
   const header = (
     <PageHeader eyebrow="Showcase · Pre-computed test" title={m.title} subtitle={m.summary}
       actions={sc && <>
-        <Link href={`/experiments/${sc.experiment_id}`}><Button icon={<ExternalLink className="size-4" />}>Experiment record</Button></Link>
-        <a href={apiUrl(`/api/reports/experiment/${sc.experiment_id}`)} target="_blank" rel="noreferrer"><Button variant="primary" icon={<FileText className="size-4" />}>Printable report</Button></a>
+        {!staticMode && <Link href={`/experiments/${sc.experiment_id}`}><Button icon={<ExternalLink className="size-4" />}>Experiment record</Button></Link>}
+        {reportUrl && <a href={reportUrl} target="_blank" rel="noreferrer"><Button variant="primary" icon={<FileText className="size-4" />}>Printable report</Button></a>}
       </>} />
   );
 
@@ -107,7 +91,6 @@ export default function ShowcasePage() {
 
   const s = spec.data?.specimen;
   const exp = spec.data?.experiments[0];
-  const sourceArt = spec.data?.artifacts.find((a) => a.kind === "source_image");
   const ref = m.contact_angle.reference;
   const refMean = (ref.left_deg + ref.right_deg) / 2;
   const r = ca.data;
@@ -140,7 +123,7 @@ export default function ShowcasePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <figure className="rounded-lg border border-line bg-panel p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {sourceArt && <img src={apiUrl(`/api/artifacts/${sourceArt.id}/download?inline=true`)} alt="Original goniometer screenshot from Wikimedia Commons" className="w-full rounded" />}
+                  {sourceImg && <img src={sourceImg} alt="Original goniometer screenshot from Wikimedia Commons" className="w-full rounded" />}
                   <figcaption className="mt-2 text-xs text-muted">
                     Input · source frame: “{m.contact_angle.source.title}” by {m.contact_angle.source.author},{" "}
                     <a className="text-accent underline" href={m.contact_angle.source.url} target="_blank" rel="noreferrer">Wikimedia Commons</a>,{" "}
@@ -149,7 +132,7 @@ export default function ShowcasePage() {
                 </figure>
                 <figure className="rounded-lg border border-line bg-panel p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {r.overlay_artifact_id && <img src={apiUrl(`/api/artifacts/${r.overlay_artifact_id}/download?inline=true`)} alt="WETCOR AI annotated analysis of the droplet" className="w-full rounded" />}
+                  {overlayImg && <img src={overlayImg} alt="WETCOR AI annotated analysis of the droplet" className="w-full rounded" />}
                   <figcaption className="mt-2 text-xs text-muted">Output · WETCOR AI analysis: cyan baseline, green detected boundary, amber contact points and tangents, magenta circle fit.</figcaption>
                 </figure>
               </div>
@@ -228,11 +211,18 @@ export default function ShowcasePage() {
               <li>The corrosion current density and rate come from a documented Tafel procedure with recorded regions, area and material properties.</li>
               <li>One specimen cannot answer the research question: the ML comparison needs at least 4 (exploratory) and ideally 15 independent specimens with both measurements.</li>
             </ul>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {caId && <Link href={`/wettability/${caId}`}><Button size="sm">Contact-angle record</Button></Link>}
-              {pdpId && <Link href={`/corrosion/runs/${pdpId}`}><Button size="sm">Polarisation run</Button></Link>}
-              <Link href={`/experiments/specimens/${sc.specimen_id}`}><Button size="sm">Specimen</Button></Link>
-            </div>
+            {staticMode ? (
+              <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
+                This hosted page is a static snapshot of a test computed by WETCOR AI. The full application — live camera capture, import of your own potentiostat files,
+                the experiment database and ML Studio — runs locally: <a className="text-accent underline" href={REPO_URL} target="_blank" rel="noreferrer">source and setup on GitHub</a>.
+              </p>
+            ) : (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {caId && <Link href={`/wettability/${caId}`}><Button size="sm">Contact-angle record</Button></Link>}
+                {pdpId && <Link href={`/corrosion/runs/${pdpId}`}><Button size="sm">Polarisation run</Button></Link>}
+                <Link href={`/experiments/specimens/${sc.specimen_id}`}><Button size="sm">Specimen</Button></Link>
+              </div>
+            )}
           </Card>
         </Section>
       </div>

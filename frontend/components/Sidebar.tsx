@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
+import { REPO_URL, isStaticDemo } from "@/lib/mode";
 import { cx } from "./ui";
 
 export const NAV = [
@@ -20,9 +21,10 @@ export const NAV = [
 
 type Health = "checking" | "online" | "degraded" | "offline";
 
-export function useBackendHealth(intervalMs = 15000): Health {
+export function useBackendHealth(intervalMs = 15000, enabled = true): Health {
   const [state, setState] = useState<Health>("checking");
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     const check = async () => {
       try {
@@ -39,13 +41,15 @@ export function useBackendHealth(intervalMs = 15000): Health {
       alive = false;
       clearInterval(id);
     };
-  }, [intervalMs]);
+  }, [intervalMs, enabled]);
   return state;
 }
 
 export function Sidebar() {
   const path = usePathname() || "/";
-  const health = useBackendHealth();
+  const staticDemo = isStaticDemo();
+  const health = useBackendHealth(15000, !staticDemo);
+  const items = staticDemo ? NAV.filter((n) => n.href === "/showcase") : NAV;
   const dot = { checking: "bg-muted", online: "bg-good", degraded: "bg-warn", offline: "bg-bad" }[health];
   const text = { checking: "Checking backend…", online: "Backend connected", degraded: "Backend degraded", offline: "Backend unreachable" }[health];
   return (
@@ -61,9 +65,9 @@ export function Sidebar() {
         </div>
       </div>
       <nav aria-label="Main" className="flex-1 space-y-0.5 p-2">
-        {NAV.map(({ href, label, icon: Icon, group }, i) => {
+        {items.map(({ href, label, icon: Icon, group }, i) => {
           const active = path === href || path.startsWith(href + "/");
-          const heading = group && group !== NAV[i - 1]?.group;
+          const heading = group && group !== items[i - 1]?.group;
           return (
             <div key={href}>
             {heading && <div className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted/80 max-md:hidden">{group}</div>}
@@ -83,13 +87,20 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-line px-4 py-3 text-xs text-muted" role="status" aria-live="polite">
-        <div className="flex items-center gap-2">
-          <span className={cx("size-2 rounded-full", dot)} aria-hidden />
-          <span className="max-md:hidden">{text}</span>
+      {staticDemo ? (
+        <div className="border-t border-line px-4 py-3 text-xs text-muted">
+          <div className="flex items-center gap-2"><span className="size-2 rounded-full bg-warn" aria-hidden /><span className="max-md:hidden">Hosted static demo</span></div>
+          <a className="mt-1 block text-[11px] text-accent underline max-md:hidden" href={REPO_URL} target="_blank" rel="noreferrer">Run the full app locally</a>
         </div>
-        <div className="mt-1 truncate font-mono text-[10px] max-md:hidden" title={API_URL}>{API_URL.replace(/^https?:\/\//, "")}</div>
-      </div>
+      ) : (
+        <div className="border-t border-line px-4 py-3 text-xs text-muted" role="status" aria-live="polite">
+          <div className="flex items-center gap-2">
+            <span className={cx("size-2 rounded-full", dot)} aria-hidden />
+            <span className="max-md:hidden">{text}</span>
+          </div>
+          <div className="mt-1 truncate font-mono text-[10px] max-md:hidden" title={API_URL}>{API_URL.replace(/^https?:\/\//, "")}</div>
+        </div>
+      )}
     </aside>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Sidebar } from "@/components/Sidebar";
+import { StaticGate } from "@/components/StaticGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex">
           <Sidebar />
           <main id="main" className="min-w-0 flex-1 px-6 py-6 max-sm:px-4">
-            <div className="mx-auto max-w-[1440px]">{children}</div>
+            <div className="mx-auto max-w-[1440px]"><StaticGate>{children}</StaticGate></div>
           </main>
         </div>
       </body>

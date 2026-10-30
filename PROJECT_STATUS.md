@@ -9,6 +9,7 @@
 * **Reports**: print-ready experiment and ML reports (matplotlib SVG), 8 CSV exports.
 * **Frontend**: Next.js 16 / React 19 / Tailwind 4 dark instrument UI; research-status dashboard; grouped navigation; empty, loading, warning and error states throughout; origin badges (Measured / Calculated / Predicted / Demo); responsive to 375 px.
 * **Showcase example** (`/showcase`, `data/showcase/`): pre-computed presentation test — public goniometer frame (CC BY-SA 4.0, stand-in for steel; WETCOR 111.2° vs instrument 114.6°) + synthetic OCP/polarisation, built by the normal analysis code from an editable manifest.
+* **Hosted static demo** (`netlify.toml`, `docs/NETLIFY.md`): the showcase is exported to `frontend/public/showcase-static/` (`scripts/export_static_showcase.py`); with `NEXT_PUBLIC_STATIC_DEMO=1` the frontend serves only `/showcase` from that snapshot, makes no API calls, and other pages show a "needs the local backend" notice. Verified locally with the backend stopped; **not yet deployed to Netlify**.
 * **Demo workspace** (explicit load/reset) and `data/demo` synthetic sample files.
 * **Windows scripts**: setup, run (health-checked, auto-rebuild), stop (own processes only).
 
@@ -16,7 +17,7 @@
 `setup-windows.ps1` · `run-local.ps1` (prod and `-Dev`) · `stop-local.ps1` · `pytest backend/tests` · `npm test` · `npm run typecheck` · `next build` · `scripts/generate_demo_files.py` · `scripts/export_api_docs.py`.
 
 ## Results
-* Backend tests: **83 passed, 0 failed**. Frontend tests: **24 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
+* Backend tests: **83 passed, 0 failed**. Frontend tests: **28 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
 * Setup, start and stop scripts verified on this machine (stop script bug found and fixed: it previously failed to match the backend command line).
 * Details: docs/TEST_REPORT.md.
 
