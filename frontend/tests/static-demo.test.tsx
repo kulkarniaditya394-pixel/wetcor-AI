@@ -18,28 +18,37 @@ const snapshot = {
 };
 
 describe("hosted static demo mode", () => {
-  it("offers only the showcase and never polls a backend", async () => {
+  it("offers the showcase and the two labs, and never polls a backend", async () => {
     vi.stubEnv("NEXT_PUBLIC_STATIC_DEMO", "1");
     const f = vi.fn();
     vi.stubGlobal("fetch", f);
     nav.pathname = "/showcase";
     render(<Sidebar />);
     expect(screen.getAllByRole("link").map((a) => a.textContent)).toContain("Showcase");
-    expect(screen.queryByRole("link", { name: "Corrosion Lab" })).not.toBeInTheDocument();
-    expect(screen.getByText("Hosted static demo")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Wettability Lab" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Corrosion Lab" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "ML Studio" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Experiments" })).not.toBeInTheDocument();
+    expect(screen.getByText("Hosted site")).toBeInTheDocument();
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("explains that other pages need the local backend, but lets the showcase through", () => {
+  it("explains that database pages need the local app, but lets the showcase and labs through", () => {
     vi.stubEnv("NEXT_PUBLIC_STATIC_DEMO", "1");
-    nav.pathname = "/corrosion";
+    nav.pathname = "/experiments";
     const { unmount } = render(<StaticGate><div>live page</div></StaticGate>);
-    expect(screen.getByText("This page needs the local backend")).toBeInTheDocument();
+    expect(screen.getByText("This page needs the local app")).toBeInTheDocument();
     expect(screen.queryByText("live page")).not.toBeInTheDocument();
     unmount();
-    nav.pathname = "/showcase";
+    for (const path of ["/showcase", "/wettability", "/corrosion"]) {
+      nav.pathname = path;
+      const r = render(<StaticGate><div>live page</div></StaticGate>);
+      expect(screen.getByText("live page")).toBeInTheDocument();
+      r.unmount();
+    }
+    nav.pathname = "/wettability/0"; // record pages need the database
     render(<StaticGate><div>live page</div></StaticGate>);
-    expect(screen.getByText("live page")).toBeInTheDocument();
+    expect(screen.queryByText("live page")).not.toBeInTheDocument();
   });
 
   it("is a no-op in normal (local) mode", () => {
@@ -70,5 +79,17 @@ describe("static demo root", () => {
     nav.pathname = "/";
     render(<StaticGate><div>showcase here</div></StaticGate>);
     expect(screen.getByText("showcase here")).toBeInTheDocument();
+  });
+});
+
+describe("hosted engine routing", () => {
+  it("sends analysis calls to the in-browser engine instead of an HTTP backend", async () => {
+    vi.stubEnv("NEXT_PUBLIC_STATIC_DEMO", "1");
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    const { engineRoute } = await import("@/lib/engine");
+    await expect(engineRoute("/api/specimens", { method: "GET" })).rejects.toThrow(/not available in the hosted demo/);
+    await expect(engineRoute("/api/wettability/analyze", { method: "POST", body: new FormData() })).rejects.toThrow(/Missing 'image' file/);
+    expect(f).not.toHaveBeenCalled();
   });
 });

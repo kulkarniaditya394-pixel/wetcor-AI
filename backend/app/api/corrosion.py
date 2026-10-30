@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ from app.core.serial import clean
 from app.database.models import Artifact, CorrosionAnalysis, CorrosionRun, DerivedMetric
 from app.database.session import get_session
 from app.schemas.models import AnalyzeRequest, CorrosionRunOut, ImportMeta
+from app.services import quick
 from app.services.electrochemistry import analysis as A
 from app.services.electrochemistry import materials as MAT
 from app.services.electrochemistry.parser import ParseError, parse_table, suggest_mapping
@@ -33,9 +35,7 @@ def _check_ext(name: str | None) -> None:
 
 @router.get("/methods")
 def methods():
-    return {"methods": A.METHODS, "required": {m: [list(g) for g in r] for m, r in A.REQUIRED.items()},
-            "allowed_roles": {m: sorted(r) for m, r in A.ALLOWED.items()}, "units": FACTORS, "canonical": CANONICAL,
-            "materials": MAT.all_profiles()}
+    return quick.corrosion_methods()
 
 
 @router.post("/import/preview")
@@ -43,17 +43,23 @@ async def preview(file: UploadFile = File(...)):
     _check_ext(file.filename)
     data = await read_upload(file)
     try:
-        t = parse_table(data)
-    except ParseError as exc:
-        raise HTTPException(422, str(exc)) from None
-    return clean({
-        "filename": file.filename, "size_bytes": len(data), "encoding": t.encoding, "delimiter": t.delimiter, "decimal_comma": t.decimal_comma,
-        "columns": t.columns, "units_row": t.units_row, "n_rows": int(len(t.data)), "header_line": t.header_line, "data_start_line": t.data_start_line,
-        "metadata": t.metadata, "warnings": t.warnings, "preview_rows": t.preview_rows(20),
-        "raw_head": data[:3000].decode(t.encoding if t.encoding != "utf-8-sig" else "utf-8", errors="replace").splitlines()[:40],
-        "suggestion": suggest_mapping(t.columns, t.units_row, t.data),
-        "columns_data": {c: t.data[: min(len(t.data), 4000), k] for k, c in enumerate(t.columns)},
-    })
+        return quick.corrosion_preview(data, file.filename or "")
+    except quick.QuickError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.post("/quick")
+async def quick_analysis(file: UploadFile = File(...), meta: str = Form(...), params: str | None = Form(None), material: str | None = Form(None),
+                         db: Session = Depends(get_session)):
+    """Analyse an export without storing anything (same code the hosted browser engine runs)."""
+    _check_ext(file.filename)
+    data = await read_upload(file)
+    m, p = parse_form_json(meta, ImportMeta), json.loads(params or "{}")
+    try:
+        return quick.corrosion_quick(data, {**m.model_dump(), "specimen_id": None}, p, json.loads(material) if material else None,
+                                     m.reference_electrode, limits(db)["electrochemistry"])
+    except quick.QuickError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
 
 
 @router.post("/import", status_code=201)
@@ -115,17 +121,10 @@ def load_frame(db: Session, run: CorrosionRun) -> pd.DataFrame:
 
 
 def _material(body: AnalyzeRequest) -> dict | None:
-    if not body.material:
-        return None
-    mat = body.material.model_dump()
-    if mat.get("profile"):
-        if mat["profile"] not in MAT.PROFILES:
-            raise HTTPException(422, f"Unknown material profile '{mat['profile']}'.")
-        prof = MAT.profile(mat["profile"])
-        mat = {**prof, "is_alloy": False, "profile": prof["key"]}
-    if not any(mat.get(k) is not None for k in ("equivalent_weight_g_eq", "density_g_cm3")):
-        return None
-    return mat
+    try:
+        return quick.resolve_material(body.material.model_dump() if body.material else None)
+    except quick.QuickError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
 
 
 def run_analysis(db: Session, run: CorrosionRun, body: AnalyzeRequest) -> dict:

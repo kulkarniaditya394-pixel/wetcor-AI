@@ -10,8 +10,9 @@ Recorded 2026-10-30 on Windows 11, Python 3.11.15, Node 24.17.0. All fixtures ar
 | Backend: database / migrations | `pytest backend/tests/test_database.py` | 4 passed |
 | Backend: API integration flows | `pytest backend/tests/test_api.py` | 13 passed |
 | Backend: showcase example | `pytest backend/tests/test_showcase.py` | 1 passed |
-| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **83 passed, 0 failed** |
-| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **29 passed, 0 failed** |
+| Backend: stateless/browser engine | `pytest backend/tests/test_quick.py` | 5 passed |
+| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **88 passed, 0 failed** |
+| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **30 passed, 0 failed** |
 | Frontend typecheck | `npm run typecheck` | passed |
 | Frontend production build | `npm run build` (Next.js 16.4.2) | passed, 14 routes |
 | Windows setup | `setup-windows.ps1` | completed (venv, pip, npm ci, DB init, build) |
@@ -41,3 +42,9 @@ Built with `NEXT_PUBLIC_STATIC_DEMO=1` and served with the backend stopped: `/` 
 
 ### Static export (replaces the Netlify Next.js runtime)
 `NETLIFY=true npm run build` (no other variable) produces `frontend/out` (plain HTML/CSS/JS); served with a static server with Netlify-style pretty URLs: `/`, `/showcase` and the snapshot return 200, the showcase renders (111.2 deg, 2 images, 2 plots, CSS applied), `/corrosion` shows the local-backend notice, unknown paths return the 404 page. Local (non-static) build unchanged; arbitrary record IDs (`/wettability/5` etc.) still render.
+
+## In-browser engine (hosted site)
+* Wettability + electrochemistry suites run **inside Pyodide 314.0.7 under Node** (OpenCV 4.11, SciPy 1.18, pandas 3.0.2): 55 passed, 0 failed; dispatcher on the showcase files gave 111.23 deg and i_corr 7.824 uA/cm2, identical to the server.
+* Exported site served by a static server, in a real browser: engine loads (~15 s first time), uploads of 65 deg and 112 deg droplets -> 65.0 deg hydrophilic / 112.1 deg hydrophobic in ~0.3 s; polarisation file -> wizard demands the electrode area, auto-proposed Tafel regions flagged, confirmed regions + Fe profile -> i_corr 7.735 uA/cm2, beta_a 69.7, beta_c 128.5 mV/dec, CR 0.0897 mm/y, with plot.
+* Note: the in-app test browser refuses `importScripts` from a CDN inside workers, so the engine uses an ES-module worker (`import` of `pyodide.mjs`), which loaded fine.
+* Not verified: a real Netlify deploy; camera capture on the hosted site (browser pane blocks the camera).

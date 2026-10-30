@@ -18,6 +18,7 @@ from app.core.serial import clean
 from app.database.models import Artifact, ContactAngleRun, utcnow
 from app.database.session import get_session
 from app.schemas.models import CAMeasurementMeta, CAParams, CAPatch, CARunOut
+from app.services import quick
 from app.services.storage import StorageError, audit, read_artifact, store_artifact
 from app.services.wettability.detection import analyze
 from app.services.wettability.overlay import render_overlay
@@ -41,13 +42,7 @@ async def analyze_image(image: UploadFile = File(...), params: str | None = Form
         raise HTTPException(415, f"Unsupported image type {image.content_type}.")
     data = await read_upload(image)
     p = parse_form_json(params, CAParams)
-    lim = limits(db)["wettability"]
-    result = _run(data, p, lim)
-    if include_auto and result.get("manual_correction"):
-        result["auto_result"] = _run(data, _auto_only(p), lim)
-    overlay = render_overlay(data, result) if result["image"] else None
-    result["overlay_png_base64"] = base64.b64encode(overlay).decode() if overlay else None
-    return result
+    return quick.wettability_analyze(data, p.model_dump(exclude_none=True), limits(db)["wettability"], include_auto)
 
 
 @router.post("/measurements", status_code=201)

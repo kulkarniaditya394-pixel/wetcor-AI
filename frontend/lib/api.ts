@@ -1,4 +1,6 @@
-/** Client for the local FastAPI backend. Nothing is sent anywhere else. */
+import { isStaticDemo } from "./mode";
+
+/** Client for the local FastAPI backend (or, on the hosted static site, the in-browser engine). Nothing is sent anywhere else. */
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8100").replace(/\/$/, "");
 
 export class ApiError extends Error {
@@ -20,6 +22,11 @@ export function detailText(detail: unknown): string {
 type Init = Omit<RequestInit, "body"> & { json?: unknown; body?: BodyInit };
 
 export async function api<T = unknown>(path: string, init: Init = {}): Promise<T> {
+  if (isStaticDemo()) {
+    // Hosted static site: no backend; the analysis runs in the browser (lib/engine.ts).
+    const { engineRoute } = await import("./engine");
+    return (await engineRoute(path, init)).value as T;
+  }
   const { json, headers, ...rest } = init;
   let res: Response;
   try {

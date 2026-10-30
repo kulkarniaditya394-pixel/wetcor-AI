@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Plot } from "@/components/Plot";
+import { EngineBanner } from "@/components/EngineBanner";
+import { QuickAnalysis } from "@/components/QuickAnalysis";
 import { SpecimenPicker } from "@/components/SpecimenPicker";
 import { Alert, Badge, Button, Card, EmptyState, Field, LabeledInput, PageHeader, Select, Table, Textarea, cx } from "@/components/ui";
 import { useApi } from "@/hooks/useApi";
 import { api, form, type CorrosionRun, type Specimen } from "@/lib/api";
 import { fmtDate, unit } from "@/lib/format";
+import { isStaticDemo } from "@/lib/mode";
 
 type Method = "ocp" | "lpr" | "pdp" | "eis";
 type Preview = {
@@ -32,7 +35,9 @@ const METHOD_HELP: Record<Method, string> = {
 export default function CorrosionPage() {
   const router = useRouter();
   const meta = useApi<Methods>("/api/corrosion/methods");
-  const runs = useApi<CorrosionRun[]>("/api/corrosion/runs?limit=20");
+  const hosted = isStaticDemo();
+  const runs = useApi<CorrosionRun[]>(hosted ? null : "/api/corrosion/runs?limit=20");
+  const [quickKey, setQuickKey] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [pv, setPv] = useState<Preview | null>(null);
@@ -77,11 +82,11 @@ export default function CorrosionPage() {
     for (const r of roles) if (mapping[r] && !units[r]) out.push(`Select the unit for ${ROLE_LABEL[r].toLowerCase()} ('${mapping[r]}').`);
     if ((method === "lpr" || method === "pdp") && mapping.current && !mapping.current_density && !area && !spec.s?.exposed_area_cm2)
       out.push("Enter the exposed electrode area (or record it on the specimen) to convert current to current density.");
-    if (!spec.id) out.push("Select the specimen this run belongs to.");
+    if (!hosted && !spec.id) out.push("Select the specimen this run belongs to.");
     return out;
   }, [pv, method, meta.data, mapping, units, roles, area, spec]);
 
-  const state = !file ? ["Awaiting file", "neutral"] : pvErr ? ["Error: file not readable", "bad"] : !pv ? ["Reading file…", "neutral"] : issues.length ? ["Columns require mapping", "warn"] : ["Ready to import", "good"];
+  const state = !file ? ["Awaiting file", "neutral"] : pvErr ? ["Error: file not readable", "bad"] : !pv ? ["Reading file…", "neutral"] : issues.length ? ["Columns require mapping", "warn"] : [hosted ? "Ready to analyse" : "Ready to import", "good"];
 
   const previewPlot = useMemo(() => {
     if (!pv || !method || !meta.data || issues.some((i) => i.startsWith("Map") || i.startsWith("Select the unit"))) return null;
@@ -128,8 +133,9 @@ export default function CorrosionPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Instrument · Potentiostat import" title="Corrosion Lab" subtitle="Import potentiostat exports (CSV, TSV, TXT), map columns and units explicitly, then analyse OCP, LPR, polarisation or EIS data."
+      <PageHeader eyebrow="Instrument · Potentiostat import" title="Corrosion Lab" subtitle={hosted ? "Drop a potentiostat export (CSV, TSV, TXT), map columns and units, and get the corrosion parameters calculated in your browser — OCP, LPR, polarisation (Tafel) or EIS." : "Import potentiostat exports (CSV, TSV, TXT), map columns and units explicitly, then analyse OCP, LPR, polarisation or EIS data."}
         actions={<Badge tone={state[1] as "neutral"}>{state[0]}</Badge>} />
+      <EngineBanner />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <Card title="1 · Measurement file">
@@ -223,9 +229,9 @@ export default function CorrosionPage() {
 
         <div className="flex min-w-0 flex-col gap-5">
           {pv && (
-            <Card title="4 · Specimen and test metadata">
+            <Card title={hosted ? "4 · Test metadata" : "4 · Specimen and test metadata"}>
               <div className="flex flex-col gap-3">
-                <SpecimenPicker specimenId={spec.id} experimentId={spec.exp} onChange={(id, exp, s) => setSpec({ id, exp, s })} />
+                {!hosted && <SpecimenPicker specimenId={spec.id} experimentId={spec.exp} onChange={(id, exp, s) => setSpec({ id, exp, s })} />}
                 <LabeledInput label="Exposed electrode area (cm²)" type="number" min={0} step="any" value={area} onChange={(e) => setArea(e.target.value)}
                   hint={spec.s?.exposed_area_cm2 ? `Leave blank to use the specimen record (${spec.s.exposed_area_cm2} cm²).` : "Required when the file has total current only."} />
                 <LabeledInput label="Reference electrode" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. SCE, Ag/AgCl (3 M KCl)" />
@@ -235,11 +241,15 @@ export default function CorrosionPage() {
             </Card>
           )}
           {pv && (
-            <Card title="5 · Validate and import">
-              {issues.length ? <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-warn">{issues.map((i) => <li key={i}>{i}</li>)}</ul> : <Alert tone="good">Mapping complete. Review the plot, then import.</Alert>}
+            <Card title={hosted ? "5 · Validate and analyse" : "5 · Validate and import"}>
+              {issues.length ? <ul className="mb-3 list-disc space-y-1 pl-5 text-sm text-warn">{issues.map((i) => <li key={i}>{i}</li>)}</ul> : <Alert tone="good">Mapping complete. Review the plot, then {hosted ? "analyse" : "import"}.</Alert>}
               {previewPlot && <Plot data={previewPlot.data} layout={{ ...previewPlot.layout, margin: { l: 60, r: 10, t: 10, b: 45 }, showlegend: false }} height={240} label="Preview plot of mapped data" />}
               {importErr && <div className="mt-3"><Alert tone="bad" title="Import refused">{importErr}</Alert></div>}
-              <Button className="mt-3 w-full" variant="primary" size="lg" disabled={!!issues.length} busy={busy} onClick={submit}>Import run</Button>
+              {hosted ? (
+                <Button className="mt-3 w-full" variant="primary" size="lg" disabled={!!issues.length} onClick={() => { setQuickKey((k) => k + 1); setTimeout(() => document.getElementById("quick-analysis")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}>Analyse (not saved)</Button>
+              ) : (
+                <Button className="mt-3 w-full" variant="primary" size="lg" disabled={!!issues.length} busy={busy} onClick={submit}>Import run</Button>
+              )}
             </Card>
           )}
           {!pv && (
@@ -257,7 +267,7 @@ export default function CorrosionPage() {
               </p>
             </Card>
           )}
-          <Card title="Recent runs">
+          {!hosted && <Card title="Recent runs">
             {runs.error ? <Alert tone="bad">{runs.error}</Alert> : !runs.data?.length ? (
               <EmptyState title="No electrochemical runs yet">Import an export from your potentiostat. Demo files are in <code>data/demo/</code>.</EmptyState>
             ) : (
@@ -271,9 +281,12 @@ export default function CorrosionPage() {
                 ))}
               </ul>
             )}
-          </Card>
+          </Card>}
         </div>
       </div>
+      {hosted && quickKey > 0 && file && method && (
+        <QuickAnalysis key={quickKey} input={{ file, method, mapping, units, imag, anodicNeg, area, reference: ref }} />
+      )}
     </>
   );
 }

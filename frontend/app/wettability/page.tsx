@@ -7,10 +7,12 @@ import { AnnotationCanvas, type Handles } from "@/components/AnnotationCanvas";
 import { CameraPanel } from "@/components/CameraPanel";
 import { SpecimenPicker } from "@/components/SpecimenPicker";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, LabeledInput, OriginBadge, PageHeader, Select, StatusDot, Table, Textarea } from "@/components/ui";
+import { EngineBanner } from "@/components/EngineBanner";
 import { useApi } from "@/hooks/useApi";
 import type { Capture } from "@/hooks/useCamera";
 import { api, form, type CAResult, type CARun, type Pt } from "@/lib/api";
 import { fmtDate, fmtDeg } from "@/lib/format";
+import { isStaticDemo } from "@/lib/mode";
 import { CA_NOTE, classTone } from "@/lib/wettability";
 
 type Shot = Capture & { source: "camera" | "upload"; filename: string };
@@ -49,7 +51,8 @@ export default function WettabilityPage() {
   const [autoResult, setAutoResult] = useState<CAResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const recent = useApi<CARun[]>("/api/wettability/measurements?limit=8");
+  const hosted = isStaticDemo();
+  const recent = useApi<CARun[]>(hosted ? null : "/api/wettability/measurements?limit=8");
 
   const params = useCallback((o: Opts, h: Handles | null, corr: boolean, r: typeof roi) => {
     const p: Record<string, unknown> = { mode: o.mode, polarity: o.polarity, primary_method: o.primary_method };
@@ -97,7 +100,8 @@ export default function WettabilityPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Instrument · Contact angle" title="Wettability Lab" subtitle="Sessile-drop water contact angle from a USB camera: capture, automatic geometric analysis, manual correction and traceable saving." />
+      <PageHeader eyebrow="Instrument · Contact angle" title="Wettability Lab" subtitle={hosted ? "Upload a droplet photo or use your camera: the contact angle is measured in your browser and the surface is classed hydrophilic or hydrophobic." : "Sessile-drop water contact angle from a USB camera: capture, automatic geometric analysis, manual correction and traceable saving."} />
+      <EngineBanner />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <div className={shot ? "hidden" : ""}>
@@ -167,7 +171,7 @@ export default function WettabilityPage() {
               </div>
             </Card>
           )}
-          {!shot && <RecentMeasurements runs={recent.data} loading={recent.loading} error={recent.error} />}
+          {!shot && !hosted && <RecentMeasurements runs={recent.data} loading={recent.loading} error={recent.error} />}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
@@ -175,7 +179,7 @@ export default function WettabilityPage() {
           {shot ? (
             <>
               <ResultPanel result={result} auto={autoResult} busy={busy} />
-              <SavePanel shot={shot} result={result} params={params(opts, handles, corrected, roi)} onSaved={() => { recent.reload(); }} onDiscard={discard} />
+              {hosted ? <HostedActions result={result} filename={shot.filename} onDiscard={discard} /> : <SavePanel shot={shot} result={result} params={params(opts, handles, corrected, roi)} onSaved={() => { recent.reload(); }} onDiscard={discard} />}
             </>
           ) : (
             <Card title="Procedure">
@@ -339,6 +343,29 @@ function RecentMeasurements({ runs, loading, error }: { runs: CARun[] | null; lo
           ))}
         </Table>
       )}
+    </Card>
+  );
+}
+
+/** Hosted site: nothing is stored; offer the result as a download instead of the database save form. */
+function HostedActions({ result, filename, onDiscard }: { result: CAResult | null; filename: string; onDiscard: () => void }) {
+  const download = () => {
+    if (!result) return;
+    const { overlay_png_base64: _overlay, ...rest } = result;
+    const blob = new Blob([JSON.stringify({ file: filename, analysed_in: "browser (WETCOR AI hosted engine)", origin: "measured", ...rest }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `wetcor_contact_angle_${filename.replace(/.[^.]+$/, "")}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  return (
+    <Card title="Keep this result">
+      <p className="text-sm text-ink-2">This hosted site does not store records. Download the values and diagnostics, or use the annotated overlay link above. Saving measurements to a specimen database is available in the local app.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="primary" icon={<Download className="size-4" />} disabled={!result || result.mean_deg == null} onClick={download}>Download result (JSON)</Button>
+        <Button variant="ghost" onClick={onDiscard}>Analyse another image</Button>
+      </div>
     </Card>
   );
 }

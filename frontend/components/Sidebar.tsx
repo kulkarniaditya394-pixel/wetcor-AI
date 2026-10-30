@@ -49,7 +49,7 @@ export function Sidebar() {
   const path = usePathname() || "/";
   const staticDemo = isStaticDemo();
   const health = useBackendHealth(15000, !staticDemo);
-  const items = staticDemo ? NAV.filter((n) => n.href === "/showcase") : NAV;
+  const items = staticDemo ? NAV.filter((n) => ["/showcase", "/wettability", "/corrosion"].includes(n.href)) : NAV;
   const dot = { checking: "bg-muted", online: "bg-good", degraded: "bg-warn", offline: "bg-bad" }[health];
   const text = { checking: "Checking backend…", online: "Backend connected", degraded: "Backend degraded", offline: "Backend unreachable" }[health];
   return (
@@ -66,7 +66,7 @@ export function Sidebar() {
       </div>
       <nav aria-label="Main" className="flex-1 space-y-0.5 p-2">
         {items.map(({ href, label, icon: Icon, group }, i) => {
-          const active = path === href || path.startsWith(href + "/") || (staticDemo && path === "/");
+          const active = path === href || path.startsWith(href + "/") || (staticDemo && path === "/" && href === "/showcase");
           const heading = group && group !== items[i - 1]?.group;
           return (
             <div key={href}>
@@ -89,8 +89,8 @@ export function Sidebar() {
       </nav>
       {staticDemo ? (
         <div className="border-t border-line px-4 py-3 text-xs text-muted">
-          <div className="flex items-center gap-2"><span className="size-2 rounded-full bg-warn" aria-hidden /><span className="max-md:hidden">Hosted static demo</span></div>
-          <a className="mt-1 block text-[11px] text-accent underline max-md:hidden" href={REPO_URL} target="_blank" rel="noreferrer">Run the full app locally</a>
+          <div className="flex items-center gap-2"><span className="size-2 rounded-full bg-warn" aria-hidden /><span className="max-md:hidden">Hosted site</span></div>
+          <a className="mt-1 block text-[11px] text-accent underline max-md:hidden" href={REPO_URL} target="_blank" rel="noreferrer">Full app (with database &amp; ML)</a>
         </div>
       ) : (
         <div className="border-t border-line px-4 py-3 text-xs text-muted" role="status" aria-live="polite">
