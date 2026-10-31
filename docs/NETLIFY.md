@@ -5,7 +5,7 @@ compiled to WebAssembly, loaded from the jsDelivr CDN) inside a web worker. Visi
 
 * **Wettability Lab** — upload a droplet photo (or use their camera over HTTPS). OpenCV measures the left/right/mean
   contact angle, draws the baseline/boundary/tangents, and classes the surface hydrophilic / hydrophobic / boundary.
-  Manual baseline, ROI, threshold and manual-tangent correction work as in the local app.
+  Three-point placement (click start, end and top of the drop), manual baseline, ROI, threshold and manual-tangent correction work as in the local app.
 * **Corrosion Lab, Arduino rig** — paste the Serial Monitor output or type the values, and get the current comparison, what the hardware can resolve, whether the device verdict holds, and the corrosion rate once the area and material are entered.
 * **Corrosion Lab, potentiostat** — drop a potentiostat export (CSV/TSV/TXT), map columns and units, then get OCP, LPR,
   polarisation (Tafel) or EIS results: i_corr, β_a/β_c, E_corr, R_p, corrosion rate (with material properties and their
@@ -35,7 +35,7 @@ The hosted pages for them explain this.
   committed zip is stale or imports server-only code.
 * `backend/app/services/quick.py` is the single implementation used both by the local API (`/api/corrosion/quick`,
   `/api/wettability/analyze`) and by the browser engine, so results are identical. The wettability and electrochemistry
-  test suites were also run inside Pyodide (56 passed). OpenCV differs (4.11 here, 5.0 locally), so on hard photos the two can differ by a few degrees; see CONTACT_ANGLE_EVALUATION.md.
+  test suites were also run inside Pyodide (79 passed). OpenCV differs (4.11 here, 5.0 locally), so on hard photos the two can differ by a few degrees; see CONTACT_ANGLE_EVALUATION.md.
 * `frontend/lib/engine.ts` maps the app's REST calls onto engine functions, so the pages are the same code in both modes.
 * The showcase snapshot is `frontend/public/showcase-static/` (`scripts/export_static_showcase.py`).
 

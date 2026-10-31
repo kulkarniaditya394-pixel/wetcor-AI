@@ -4,17 +4,17 @@ Recorded 2026-10-30 on Windows 11, Python 3.11.15, Node 24.17.0. All fixtures ar
 
 | Suite | Command | Result |
 |---|---|---|
-| Backend: contact-angle geometry + pipeline | `pytest backend/tests/test_wettability.py` | 30 passed |
+| Backend: contact-angle geometry + pipeline | `pytest backend/tests/test_wettability.py` | 53 passed |
 | Backend: imperfect images and published photographs | `pytest backend/tests/test_detection_hard.py` | 25 passed |
 | Backend: Arduino rig parser and analysis | `pytest backend/tests/test_rig.py` | 23 passed |
 | Backend: electrochemistry | `pytest backend/tests/test_electrochemistry.py` | 26 passed |
 | Backend: ML | `pytest backend/tests/test_ml.py` | 10 passed |
 | Backend: database / migrations | `pytest backend/tests/test_database.py` | 4 passed |
-| Backend: API integration flows | `pytest backend/tests/test_api.py` | 13 passed |
+| Backend: API integration flows | `pytest backend/tests/test_api.py` | 14 passed |
 | Backend: showcase example | `pytest backend/tests/test_showcase.py` | 1 passed |
 | Backend: stateless/browser engine | `pytest backend/tests/test_quick.py` | 5 passed |
-| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **137 passed, 0 failed** |
-| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **32 passed, 0 failed** |
+| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **161 passed, 0 failed** |
+| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **33 passed, 0 failed** |
 | Frontend typecheck | `npm run typecheck` | passed |
 | Frontend production build | `npm run build` (Next.js 16.4.2) | passed, 14 routes |
 | Windows setup | `setup-windows.ps1` | completed (venv, pip, npm ci, DB init, build) |
@@ -46,7 +46,7 @@ Built with `NEXT_PUBLIC_STATIC_DEMO=1` and served with the backend stopped: `/` 
 `NETLIFY=true npm run build` (no other variable) produces `frontend/out` (plain HTML/CSS/JS); served with a static server with Netlify-style pretty URLs: `/`, `/showcase` and the snapshot return 200, the showcase renders (111.2 deg, 2 images, 2 plots, CSS applied), `/corrosion` shows the local-backend notice, unknown paths return the 404 page. Local (non-static) build unchanged; arbitrary record IDs (`/wettability/5` etc.) still render.
 
 ## In-browser engine (hosted site)
-* Wettability + electrochemistry suites run **inside Pyodide 314.0.7 under Node** (OpenCV 4.11, SciPy 1.18, pandas 3.0.2): 56 passed, 0 failed; dispatcher on the showcase files gave 113.54 deg (server 113.52) and i_corr 7.824 uA/cm2. On the hardest transparent-drop photo the OpenCV builds differ more: 122.7 deg in the browser, 130.0 deg on the server, published 129.2 deg.
+* Wettability + electrochemistry suites run **inside Pyodide 314.0.7 under Node** (OpenCV 4.11, SciPy 1.18, pandas 3.0.2): 79 passed, 0 failed; dispatcher on the showcase files gave 113.54 deg (server 113.52) and i_corr 7.824 uA/cm2. On the hardest transparent-drop photo the OpenCV builds differ more: 122.7 deg in the browser, 130.0 deg on the server, published 129.2 deg.
 * Exported site served by a static server, in a real browser: engine loads (~15 s first time), uploads of 65 deg and 112 deg droplets -> 65.0 deg hydrophilic / 112.1 deg hydrophobic in ~0.3 s; polarisation file -> wizard demands the electrode area, auto-proposed Tafel regions flagged, confirmed regions + Fe profile -> i_corr 7.735 uA/cm2, beta_a 69.7, beta_c 128.5 mV/dec, CR 0.0897 mm/y, with plot.
 * Note: the in-app test browser refuses `importScripts` from a CDN inside workers, so the engine uses an ES-module worker (`import` of `pyodide.mjs`), which loaded fine.
 * Not verified: a real Netlify deploy; camera capture on the hosted site (browser pane blocks the camera).
@@ -56,4 +56,9 @@ Exported site served by a static server, in the in-app browser with the engine r
 * Corrosion Lab, Arduino tab, the real test output (*Use example test*): verdict HEALTHY ELECTRODE, WETCOR check agrees, 145.0 and 153.0 mA, the 9.0 mA difference reported as below the 26.4 mA resolution, ACS712-05B identified. With an illustrative 12.5 cm² and Fe: 12,240 µA/cm², Faraday estimate 141.9 mm/y (range 89.3 to 195), 3.826 g/day, flagged as far above natural corrosion currents.
 * Wettability Lab, transparent drop on rough sand (published 129.2 deg) uploaded: status ok, 122.7 deg, hydrophobic, overlay drawn. This run found and fixed a defect: the page always sends the default fit method, which overrode the circle fit for traced outlines.
 * Detector accuracy: docs/CONTACT_ANGLE_EVALUATION.md.
+
+## Three-point mode (2026-10-31)
+Exported site, in-app browser, transparent drop on rough sand (published 129.2 deg): *Place 3 points*, three clicks gave 131.5 deg, hydrophobic, status ok, with the circle following the drop and the automatic result (122.7 deg) kept separately. Arrow keys recalculated the angle at once, and the magnifier showed while placing. Clicks placed before the slow first automatic analysis finished were kept: a stale result can no longer overwrite them. Test values are placed by eye, so this shows the method works, not its repeatability.
+
+The Pyodide run exposed a false measurement: contrast lifting made plain noise look like an outline, and the browser build returned an angle on an image with no drop. A traced outline must now show a real brightness step in the untouched image, and tests cover noise of 3, 5 and 8 grey levels. Evaluation results were unchanged by this (123/126 measured, 7 unflagged wrong).
 

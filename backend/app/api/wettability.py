@@ -71,7 +71,7 @@ async def save_measurement(image: UploadFile = File(...), params: str | None = F
                                  specimen_id=spec.id, experiment_id=m.experiment_id, meta={"source_artifact_id": raw.id})
     run = ContactAngleRun(
         specimen_id=spec.id, experiment_id=m.experiment_id, image_artifact_id=raw.id, overlay_artifact_id=overlay.id if overlay else None,
-        method=result["method"] or ("manual_tangent" if p.mode == "manual_tangent" else "auto_failed"), status=m.status,
+        method=result["method"] or ({"manual_tangent": "manual_tangent", "three_point": "manual_three_point"}.get(p.mode, "auto_failed")), status=m.status,
         left_deg=result["left_deg"], right_deg=result["right_deg"], mean_deg=result["mean_deg"],
         classification=(result["classification"] or {}).get("label"), analysis_params=p.model_dump(exclude_none=True),
         diagnostics={k: result.get(k) for k in ("status", "diagnostics", "methods", "geometry", "limits", "params", "lr_diff_deg",

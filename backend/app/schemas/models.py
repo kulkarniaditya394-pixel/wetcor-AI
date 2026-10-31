@@ -114,13 +114,14 @@ class Page(BaseModel):
 # ---------------- wettability ----------------
 
 class CAParams(BaseModel):
-    mode: Literal["auto", "manual_tangent"] = "auto"
+    mode: Literal["auto", "manual_tangent", "three_point"] = "auto"
     roi: list[int] | None = Field(None, min_length=4, max_length=4)
     baseline: list[Point] | None = Field(None, min_length=2, max_length=2)
     contact_left: Point | None = Field(None, min_length=2, max_length=2)
     contact_right: Point | None = Field(None, min_length=2, max_length=2)
     tangent_left: Point | None = Field(None, min_length=2, max_length=2)
     tangent_right: Point | None = Field(None, min_length=2, max_length=2)
+    apex: Point | None = Field(None, min_length=2, max_length=2)
     threshold: float | None = Field(None, ge=0, le=255)
     polarity: Literal["auto", "dark_drop", "light_drop"] = "auto"
     fit_radius_px: float | None = Field(None, gt=0, le=5000)

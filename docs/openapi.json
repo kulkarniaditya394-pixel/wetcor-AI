@@ -2436,7 +2436,8 @@
             "type": "string",
             "enum": [
               "auto",
-              "manual_tangent"
+              "manual_tangent",
+              "three_point"
             ],
             "title": "Mode",
             "default": "auto"
@@ -2539,6 +2540,22 @@
               }
             ],
             "title": "Tangent Right"
+          },
+          "apex": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apex"
           },
           "threshold": {
             "anyOf": [

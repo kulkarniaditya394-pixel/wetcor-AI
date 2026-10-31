@@ -415,7 +415,7 @@ def _search(bgr: np.ndarray, gray: np.ndarray, p: dict, lim: dict) -> tuple[dict
     automatic = not p.get("baseline") and not user_seg
     flds = [P.grey_field(gray, p.get("threshold"), p.get("polarity", "auto"))] if user_seg else P.fields(bgr, gray)
     channels = P.outline_channels(bgr)
-    arcs = [a for c in P.find_circles(gray, rng) if (a := P.trace_arc(channels, *c)) is not None] if automatic else []
+    arcs = [a for c in P.find_circles(gray, rng) if (a := P.trace_arc(channels, *c)) is not None and P.stands_out(gray, a)] if automatic else []
     across = P.global_lines(channels) if not p.get("baseline") else []
     # a patchy arc whose top lies below the plate's surface is plate texture, not a drop
     arcs = [a for a in arcs if a.top_fill >= 0.8 or not any(a.cy - a.r > b.a * a.cx + b.b + 0.05 * a.r for b in across)]
@@ -517,6 +517,8 @@ def analyze(data: bytes, params: dict | None = None, limits: dict | None = None)
 
     if p.get("mode") == "manual_tangent":
         return _manual_tangent(result, p, lim)
+    if p.get("mode") == "three_point":
+        return _three_point(result, p, lim)
 
     corrected = any(p.get(k) is not None for k in ("baseline", "contact_left", "contact_right", "threshold", "fit_radius_px")) or p.get("polarity", "auto") != "auto"
     result["manual_correction"] = corrected
@@ -637,6 +639,58 @@ def analyze(data: bytes, params: dict | None = None, limits: dict | None = None)
     result["classification"] = g.classify(mean, left, right, lim["classification_display_tolerance_deg"])
     if any(d["status"] == "fail" for d in diags):
         result["status"] = "needs_correction"
+    return result
+
+
+def _three_point(result: dict, p: dict, lim: dict) -> dict:
+    """Angle from operator points only: start and end of the drop on the surface, and its top. No image analysis is used."""
+    missing = [k for k in ("contact_left", "contact_right", "apex") if p.get(k) is None]
+    if missing:
+        result["errors"].append(f"Three-point mode requires: {', '.join(missing)}.")
+        result["status"] = "failed"
+        return result
+    try:
+        frame, cap = g.cap_from_three_points(p["contact_left"], p["contact_right"], p["apex"])
+    except g.GeometryError as exc:
+        result["errors"].append(str(exc))
+        result["status"] = "failed"
+        return result
+    theta = cap.angle_deg()
+    ul, ur = cap.contact_u()
+    apex_uv = frame.to_uv(p["apex"])[0]
+    width, height = ur - ul, float(apex_uv[1])
+
+    def half_angle(w: float, h: float) -> float:
+        return float(np.degrees(2 * np.arctan2(2 * h, w)))
+
+    shift = max(abs(half_angle(width + dw, height + dh) - half_angle(width, height)) for dw in (-2, 2) for dh in (-2, 2))
+    off = abs(apex_uv[0] - cap.uc) / width
+    if off > 0.15:
+        result["warnings"].append(f"The top point is {off * 100:.0f}% of the drop width away from the middle. Check it, or the drop is not symmetric.")
+    if shift > 5:
+        result["warnings"].append(f"Moving these points by 2 px changes the angle by about {shift:.1f} deg. Zoom in or use a larger image of the drop.")
+    tl, tr = _circle_tangent({"centre_uv": [cap.uc, cap.vc]}, ul), _circle_tangent({"centre_uv": [cap.uc, cap.vc]}, ur)
+    seg = max(20.0, 0.6 * height)
+    start, end = frame.to_xy([[ul, 0.0]])[0], frame.to_xy([[ur, 0.0]])[0]
+    w_img = float(result["image"]["width"])
+    slope = frame.d[1] / frame.d[0]
+    theta = round(theta, 2)
+    result.update(method="manual_three_point", fit_method="three_point", manual_correction=True, left_deg=theta, right_deg=theta, mean_deg=theta, lr_diff_deg=0.0)
+    result["diagnostics"] += [
+        _diag("fit_method", "Reported fit method", "three points", "pass", note="Circle through the start, end and top points. Assumes a spherical cap, so left and right are equal by construction."),
+        _diag("contact_width", "Contact width", round(width, 1), "pass", "px"),
+        _diag("drop_height", "Drop height above the baseline", round(height, 1), "pass", "px"),
+        _diag("placement", "Change if the points move 2 px", round(shift, 2), "warn" if shift > 5 else "pass", "deg", "Precision depends on where the points were placed. A heuristic, not an uncertainty."),
+    ]
+    result["geometry"].update(
+        baseline=[[0.0, float(start[1] - slope * start[0])], [w_img, float(start[1] + slope * (w_img - start[0]))]],
+        contact_left=start.round(2).tolist(), contact_right=end.round(2).tolist(), apex=[float(v) for v in p["apex"]],
+        tangent_left=[start.round(2).tolist(), frame.to_xy([[ul + tl[0] * seg, tl[1] * seg]])[0].round(2).tolist()],
+        tangent_right=[end.round(2).tolist(), frame.to_xy([[ur + tr[0] * seg, tr[1] * seg]])[0].round(2).tolist()],
+        circle={"centre": frame.to_xy([[cap.uc, cap.vc]])[0].round(2).tolist(), "radius": round(cap.r, 2)},
+        tilt_deg=round(frame.tilt_deg, 3), droplet_height_px=round(height, 1), contact_width_px=round(width, 1),
+    )
+    result["classification"] = g.classify(theta, theta, theta, lim["classification_display_tolerance_deg"])
     return result
 
 

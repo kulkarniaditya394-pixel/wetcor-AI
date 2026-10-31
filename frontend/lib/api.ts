@@ -79,7 +79,7 @@ export type Diagnostic = { key: string; label: string; value: unknown; unit: str
 export type Pt = [number, number];
 export type CAGeometry = {
   roi?: [number, number, number, number]; baseline?: Pt[]; baseline_points?: Pt[]; contact_left?: Pt; contact_right?: Pt;
-  tangent_left?: Pt[]; tangent_right?: Pt[]; contour?: Pt[]; circle?: { centre: Pt; radius: number }; tilt_deg?: number;
+  tangent_left?: Pt[]; tangent_right?: Pt[]; apex?: Pt; contour?: Pt[]; circle?: { centre: Pt; radius: number }; tilt_deg?: number;
   fit_radius_px?: number; droplet_height_px?: number; contact_width_px?: number;
 };
 export type Classification = { label: "hydrophilic" | "hydrophobic" | "boundary"; text: string; uncertain: boolean; reasons: string[]; recommend_repeat: boolean };

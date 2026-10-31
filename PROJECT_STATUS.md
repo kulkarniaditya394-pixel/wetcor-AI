@@ -2,7 +2,7 @@
 
 ## Implemented
 * **Backend** (FastAPI, SQLAlchemy/SQLite, OpenCV, SciPy, scikit-learn): 53 REST operations (docs/API.md).
-* **Wettability Lab**: camera selection/preview/capture, image upload, geometric contact-angle engine `ca-2.0.0` (multi-strategy search over drop outline and surface for imperfect photos, sub-pixel boundary, rotated-frame local tangent, spherical-cap fit, evidence tiers, diagnostics), ROI, draggable/keyboard handles, manual tangent mode, `manual_corrected` with automatic result preserved, re-analysis history, rejection with reason, overlay export.
+* **Wettability Lab**: camera selection/preview/capture, image upload, geometric contact-angle engine `ca-2.0.0` (multi-strategy search over drop outline and surface for imperfect photos, sub-pixel boundary, rotated-frame local tangent, spherical-cap fit, evidence tiers, diagnostics), ROI, draggable/keyboard handles, three-point mode (operator clicks start, end and top; angle from the circle through them), manual tangent mode, `manual_corrected` with automatic result preserved, re-analysis history, rejection with reason, overlay export.
 * **Corrosion Lab, Arduino rig**: paste Serial Monitor output or type values; parser for repeated cycles, sensor identification, ADC and noise resolution, device-verdict check, Faraday and weight-loss rates, CSV and print. Verified in a browser on the exported site with the real test output. Rig results are not saved to the database yet.
 * **Corrosion Lab, potentiostat**: CSV/TSV/TXT parser (encodings, delimiters, decimal comma, Gamry unit rows, metadata), import wizard with explicit units, OCP / LPR / Tafel / EIS analyses with validity flags, Stern–Geary and material-property provenance, CR formula, superseded-analysis history, raw + processed downloads.
 * **Experiment database**: specimens, experiments, artifacts with SHA-256, audit log, search/sort/filter/pagination, guarded deletion to trash, versioned migrations with backup.
@@ -18,7 +18,7 @@
 `setup-windows.ps1` · `run-local.ps1` (prod and `-Dev`) · `stop-local.ps1` · `pytest backend/tests` · `npm test` · `npm run typecheck` · `next build` · `scripts/generate_demo_files.py` · `scripts/export_api_docs.py`.
 
 ## Results
-* Backend tests: **137 passed, 0 failed**. Frontend tests: **32 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
+* Backend tests: **161 passed, 0 failed**. Frontend tests: **33 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
 * Setup, start and stop scripts verified on this machine (stop script bug found and fixed: it previously failed to match the backend command line).
 * Details: docs/TEST_REPORT.md.
 

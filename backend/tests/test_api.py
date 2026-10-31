@@ -241,3 +241,16 @@ def test_missing_file_reference_reported(client):
 def test_upload_limits_and_types(client):
     assert client.post("/api/corrosion/import/preview", files={"file": ("x.exe", b"MZ", "application/octet-stream")}).status_code == 415
     assert client.post("/api/wettability/analyze", files={"image": ("x.txt", b"hello", "text/plain")}).status_code == 415
+
+
+def test_three_point_measurement_can_be_saved(client):
+    s = make_specimen(client)
+    img, truth = synthetic_drop(70)
+    data = encode_png(img)
+    left, right = truth["contact_left"], truth["contact_right"]
+    params = {"mode": "three_point", "contact_left": left, "contact_right": right, "apex": [(left[0] + right[0]) / 2, left[1] - 100]}
+    r = client.post("/api/wettability/analyze", files={"image": ("c.png", data, "image/png")}, data={"params": json.dumps(params)})
+    assert r.status_code == 200 and r.json()["method"] == "manual_three_point" and r.json()["overlay_png_base64"]
+    meta = {"specimen_id": s["id"], "status": "accepted"}
+    r = client.post("/api/wettability/measurements", files={"image": ("c.png", data, "image/png")}, data={"params": json.dumps(params), "meta": json.dumps(meta)})
+    assert r.status_code == 201 and r.json()["method"] == "manual_three_point" and r.json()["mean_deg"] is not None

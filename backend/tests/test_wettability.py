@@ -189,3 +189,59 @@ def test_original_bytes_unmodified_and_no_invented_uncertainty():
     flat = str(r).lower()
     assert "confidence" not in flat and "uncertainty_deg" not in flat
     assert "not a calibrated" in r["uncertainty_note"]
+
+
+# ---------- three points ----------
+
+@pytest.mark.parametrize("theta", [20, 60, 90, 120, 150])
+@pytest.mark.parametrize("tilt", [0, 7, -12])
+def test_three_points_give_the_true_angle(theta, tilt):
+    f = g.make_frame((100, 400), (100 + 100 * np.cos(np.radians(tilt)), 400 + 100 * np.sin(np.radians(tilt))))
+    r = 150.0
+    half = r * np.sin(np.radians(theta))
+    height = r * (1 - np.cos(np.radians(theta)))
+    pts = f.to_xy([[200 - half, 0], [200 + half, 0], [200, height]])
+    assert g.cap_from_three_points(*pts)[1].angle_deg() == pytest.approx(theta, abs=1e-6)
+    assert g.cap_from_three_points(pts[1], pts[0], pts[2])[1].angle_deg() == pytest.approx(theta, abs=1e-6)  # order of start and end does not matter
+
+
+def test_top_point_off_the_middle_stays_on_the_same_circle():
+    centre, r = np.array([300.0, 300.0]), 100.0
+    start, end = centre + [-90, 43.589], centre + [90, 43.589]
+    on_arc = centre + r * np.array([np.sin(0.4), -np.cos(0.4)])
+    assert g.cap_from_three_points(start, end, on_arc)[1].angle_deg() == pytest.approx(g.cap_from_three_points(start, end, centre - [0, r])[1].angle_deg(), abs=1e-6)
+
+
+def test_three_point_mode_works_where_detection_fails():
+    img, truth = synthetic_drop(65, background=120, foreground=120, noise_sigma=3)
+    data = encode_png(img)
+    assert analyze(data)["status"] == "failed"
+    cl, cr = np.array(truth["contact_left"]), np.array(truth["contact_right"])
+    half = np.hypot(*(cr - cl)) / 2
+    top = (cl + cr) / 2 + [0, -half * np.tan(np.radians(65 / 2))]
+    r = analyze(data, {"mode": "three_point", "contact_left": cl.tolist(), "contact_right": cr.tolist(), "apex": top.tolist()})
+    assert r["status"] == "ok" and r["method"] == "manual_three_point" and r["manual_correction"] is True
+    assert r["mean_deg"] == pytest.approx(65, abs=0.1) and r["classification"]["label"] == "hydrophilic"
+    assert overlay_ok(data, r)
+
+
+def overlay_ok(data, r):
+    return render_overlay(data, r)[:4] == b"\x89PNG"
+
+
+@pytest.mark.parametrize("params,text", [
+    ({"contact_left": [100, 300]}, "requires"),
+    ({"contact_left": [100, 300], "contact_right": [300, 300], "apex": [200, 350]}, "above the line"),
+    ({"contact_left": [100, 300], "contact_right": [102, 300], "apex": [101, 200]}, "too close"),
+])
+def test_three_point_mode_refuses_bad_points(params, text):
+    img, _ = synthetic_drop(60)
+    r = analyze(encode_png(img), {"mode": "three_point", **params})
+    assert r["status"] == "failed" and r["mean_deg"] is None and text in r["errors"][0]
+
+
+@pytest.mark.parametrize("sigma", [3, 5, 8])
+def test_plain_noise_never_gets_an_angle(sigma):
+    img, _ = synthetic_drop(60, background=120, foreground=120, noise_sigma=sigma)
+    assert analyze(encode_png(img))["mean_deg"] is None
+

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { CAGeometry, Pt } from "@/lib/api";
 
-export type Handles = { baseline: [Pt, Pt]; contact_left?: Pt; contact_right?: Pt; tangent_left?: Pt; tangent_right?: Pt };
-type Key = "b1" | "b2" | "cl" | "cr" | "tl" | "tr";
+export type Handles = { baseline: [Pt, Pt]; contact_left?: Pt; contact_right?: Pt; tangent_left?: Pt; tangent_right?: Pt; apex?: Pt };
+type Key = "b1" | "b2" | "cl" | "cr" | "tl" | "tr" | "ap";
 
 const HANDLE_META: Record<Key, { label: string; color: string }> = {
   b1: { label: "Baseline point 1", color: "#2fb8c6" },
@@ -13,15 +13,24 @@ const HANDLE_META: Record<Key, { label: string; color: string }> = {
   cr: { label: "Right contact point", color: "#f2a93b" },
   tl: { label: "Left tangent point", color: "#b388ff" },
   tr: { label: "Right tangent point", color: "#b388ff" },
+  ap: { label: "Top of the drop", color: "#43c08f" },
 };
 
+/** The point a click places next in three-point mode, in the order the operator is asked for them. */
+export function nextPoint(h: Handles | null): { key: Key; prompt: string; step: number } | null {
+  if (!h?.contact_left) return { key: "cl", prompt: "the left end of the drop, exactly where it touches the surface", step: 1 };
+  if (!h.contact_right) return { key: "cr", prompt: "the right end of the drop, exactly where it touches the surface", step: 2 };
+  if (!h.apex) return { key: "ap", prompt: "the very top of the drop", step: 3 };
+  return null;
+}
+
 function get(h: Handles, k: Key): Pt | undefined {
-  return { b1: h.baseline[0], b2: h.baseline[1], cl: h.contact_left, cr: h.contact_right, tl: h.tangent_left, tr: h.tangent_right }[k];
+  return { b1: h.baseline[0], b2: h.baseline[1], cl: h.contact_left, cr: h.contact_right, tl: h.tangent_left, tr: h.tangent_right, ap: h.apex }[k];
 }
 function set(h: Handles, k: Key, p: Pt): Handles {
   if (k === "b1") return { ...h, baseline: [p, h.baseline[1]] };
   if (k === "b2") return { ...h, baseline: [h.baseline[0], p] };
-  const field = { cl: "contact_left", cr: "contact_right", tl: "tangent_left", tr: "tangent_right" }[k] as keyof Handles;
+  const field = { cl: "contact_left", cr: "contact_right", tl: "tangent_left", tr: "tangent_right", ap: "apex" }[k] as keyof Handles;
   return { ...h, [field]: p };
 }
 
@@ -35,7 +44,7 @@ function extend(a: Pt, b: Pt, w: number): [Pt, Pt] {
 
 export function AnnotationCanvas({ src, width, height, geometry, handles, onHandlesChange, mode, roi, roiDrawing, onRoi, labels }: {
   src: string; width: number; height: number; geometry?: CAGeometry | null; handles: Handles | null; onHandlesChange?: (h: Handles) => void;
-  mode: "auto" | "manual_tangent"; roi: [number, number, number, number] | null; roiDrawing: boolean; onRoi?: (r: [number, number, number, number] | null) => void;
+  mode: "auto" | "manual_tangent" | "three_point"; roi: [number, number, number, number] | null; roiDrawing: boolean; onRoi?: (r: [number, number, number, number] | null) => void;
   labels?: { left?: string; right?: string };
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -43,6 +52,7 @@ export function AnnotationCanvas({ src, width, height, geometry, handles, onHand
   const [roiStart, setRoiStart] = useState<Pt | null>(null);
   const [roiLive, setRoiLive] = useState<[number, number, number, number] | null>(null);
   const [k, setK] = useState(1); // image px per screen px
+  const [hover, setHover] = useState<Pt | null>(null); // for the magnifier
 
   useEffect(() => {
     const el = svgRef.current;
@@ -59,7 +69,9 @@ export function AnnotationCanvas({ src, width, height, geometry, handles, onHand
     return [Math.min(Math.max(x, 0), width), Math.min(Math.max(y, 0), height)];
   };
 
-  const keys: Key[] = ["b1", "b2", "cl", "cr", ...(mode === "manual_tangent" ? (["tl", "tr"] as Key[]) : [])];
+  const three = mode === "three_point";
+  const placing = three && !roiDrawing ? nextPoint(handles) : null;
+  const keys: Key[] = three ? ["cl", "cr", "ap"] : ["b1", "b2", "cl", "cr", ...(mode === "manual_tangent" ? (["tl", "tr"] as Key[]) : [])];
   const onKey = (key: Key) => (e: KeyboardEvent) => {
     if (!handles || !onHandlesChange) return;
     const step = e.shiftKey ? 10 : 1;
@@ -73,7 +85,9 @@ export function AnnotationCanvas({ src, width, height, geometry, handles, onHand
   const r = 7 * k;
   const sw = { vectorEffect: "non-scaling-stroke" as const };
   const shownRoi = roiLive ?? roi;
-  const base = handles?.baseline ?? (geometry?.baseline as [Pt, Pt] | undefined);
+  const base = three ? (handles?.contact_left && handles.contact_right ? ([handles.contact_left, handles.contact_right] as [Pt, Pt]) : undefined) : handles?.baseline ?? (geometry?.baseline as [Pt, Pt] | undefined);
+  const zoom = 4;
+  const loupe = 150; // screen px
   const tangents: [Pt | undefined, Pt | undefined][] =
     mode === "manual_tangent" && handles
       ? [[handles.contact_left, handles.tangent_left], [handles.contact_right, handles.tangent_right]]
@@ -87,13 +101,16 @@ export function AnnotationCanvas({ src, width, height, geometry, handles, onHand
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
-        className={`absolute inset-0 h-full w-full ${roiDrawing ? "cursor-crosshair" : ""}`}
+        className={`absolute inset-0 h-full w-full ${roiDrawing || placing ? "cursor-crosshair" : ""} ${three ? "touch-none" : ""}`}
+        onPointerLeave={() => { if (!drag) setHover(null); }}
         onPointerDown={(e) => {
+          if (placing && handles && onHandlesChange) return onHandlesChange(set(handles, placing.key, toImg(e)));
           if (!roiDrawing) return;
           (e.target as Element).setPointerCapture?.(e.pointerId);
           setRoiStart(toImg(e));
         }}
         onPointerMove={(e) => {
+          if (three) setHover(toImg(e));
           if (drag && handles && onHandlesChange) onHandlesChange(set(handles, drag, toImg(e)));
           else if (roiStart) {
             const p = toImg(e);
@@ -130,6 +147,7 @@ export function AnnotationCanvas({ src, width, height, geometry, handles, onHand
             const m = HANDLE_META[key];
             return (
               <g key={key}>
+                {three && <text x={p[0]} y={p[1] + (key === "ap" ? -14 : 24) * k} textAnchor="middle" fontSize={12 * k} fill={m.color} stroke="#000" strokeWidth={3 * k} paintOrder="stroke" pointerEvents="none">{{ cl: "Start", cr: "End", ap: "Top" }[key as "cl"]}</text>}
                 <circle cx={p[0]} cy={p[1]} r={r * 2.2} fill="transparent" className="cursor-grab"
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -152,6 +170,15 @@ export function AnnotationCanvas({ src, width, height, geometry, handles, onHand
             );
           })}
       </svg>
+      {three && hover && (
+        <div aria-hidden className="pointer-events-none absolute left-2 top-2 overflow-hidden rounded-md border-2 border-accent shadow-lg"
+          style={{ width: loupe, height: loupe, backgroundImage: `url(${src})`, backgroundRepeat: "no-repeat",
+            backgroundSize: `${(width / k) * zoom}px ${(height / k) * zoom}px`,
+            backgroundPosition: `${loupe / 2 - (hover[0] / k) * zoom}px ${loupe / 2 - (hover[1] / k) * zoom}px` }}>
+          <div className="absolute left-1/2 top-0 h-full w-px bg-white/70" />
+          <div className="absolute left-0 top-1/2 h-px w-full bg-white/70" />
+        </div>
+      )}
     </div>
   );
 }

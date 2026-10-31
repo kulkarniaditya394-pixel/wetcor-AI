@@ -35,6 +35,8 @@ def render_overlay(data: bytes, result: dict) -> bytes:
             cv2.line(img, _pt(seg[0]), _pt(seg[1]), AMBER, t, cv2.LINE_AA)
         if cp := geo.get(f"contact_{side}"):
             cv2.circle(img, _pt(cp), 3 * t + 2, AMBER, t, cv2.LINE_AA)
+    if apex := geo.get("apex"):
+        cv2.circle(img, _pt(apex), 3 * t + 2, GREEN, t, cv2.LINE_AA)
     scale = max(0.5, min(h, w) / 900)
     lines = []
     if result.get("mean_deg") is not None:

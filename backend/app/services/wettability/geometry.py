@@ -120,6 +120,19 @@ def fit_circle_robust(uv: np.ndarray, rounds: int = 3) -> tuple[CircleFit, float
     return fit_circle(uv[keep]), float(keep.mean())
 
 
+def cap_from_three_points(start, end, top) -> tuple[Frame, CircleFit]:
+    """Spherical cap through both contact points and the top of the drop. The baseline is the line through the contact
+    points, so a tilted surface needs no correction, and a top point slightly off the middle stays on the same circle."""
+    frame = make_frame(start, end)
+    ul, ur = sorted(frame.to_uv([start, end])[:, 0])
+    ua, va = frame.to_uv(top)[0]
+    if va < 2:
+        raise GeometryError("The top point must be above the line through the start and end points.")
+    half, mid = (ur - ul) / 2, (ul + ur) / 2
+    vc = ((ua - mid) ** 2 + va**2 - half**2) / (2 * va)
+    return frame, CircleFit(float(mid), float(vc), float(np.hypot(half, vc)), 0.0)
+
+
 @dataclass
 class SideFit:
     side: str

@@ -602,6 +602,18 @@ def global_lines(channels: list[np.ndarray], limit: int = 3) -> list[Guess]:
     return [Guess("surface", a, y0 - a * w / 2, float(np.clip(0.75 + s / 150, 0.75, 0.95)), 2.0, f"straight surface edge across the image (step of {s:.0f} grey levels)") for a, y0, s in peaks]
 
 
+def stands_out(gray: np.ndarray, arc: Arc) -> bool:
+    """Contrast lifting finds faint outlines but also makes plain noise look like one, so a traced outline must show a
+    real brightness step across it in the untouched image."""
+    blur = cv2.GaussianBlur(gray, (0, 0), 2.0).astype(np.float32)
+    rel = arc.points - [arc.cx, arc.cy]
+    across = rel / np.maximum(np.linalg.norm(rel, axis=1, keepdims=True), 1e-6) * max(3.0, 0.03 * arc.r)
+    inner, outer = arc.points - across, arc.points + across
+    a = map_coordinates(blur, [inner[:, 1], inner[:, 0]], order=1, mode="nearest")
+    b = map_coordinates(blur, [outer[:, 1], outer[:, 0]], order=1, mode="nearest")
+    return float(np.median(np.abs(a - b))) >= 2.5
+
+
 def arc_lines(arc: Arc, surfaces: list[Guess]) -> list[Guess]:
     """Baselines for a traced arc: the surface beside the drop, a straight edge agreeing with both arc ends, else the line through the ends."""
     pl, pr = arc.ends

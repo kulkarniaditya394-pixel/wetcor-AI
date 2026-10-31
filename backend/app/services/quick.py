@@ -35,7 +35,7 @@ class QuickError(Exception):
 def wettability_analyze(data: bytes, params: dict, limits: dict | None = None, include_auto: bool = True) -> dict:
     lim = limits or D.defaults()["wettability"]
     result = clean(analyze_ca(data, params, lim))
-    if include_auto and result.get("manual_correction"):
+    if include_auto and result.get("manual_correction") and params.get("mode") != "three_point":  # points are nudged often; the page already has the automatic result
         result["auto_result"] = clean(analyze_ca(data, {k: v for k, v in params.items() if k in ("roi", "primary_method")}, lim))
     result["overlay_png_base64"] = base64.b64encode(render_overlay(data, result)).decode() if result["image"] else None
     return result

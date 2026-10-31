@@ -43,6 +43,7 @@ See [CONTACT_ANGLE_EVALUATION.md](CONTACT_ANGLE_EVALUATION.md). This is a geomet
 
 ### 1.4 Manual correction
 * Moving the baseline or contact points, changing threshold, polarity or fitting radius re-runs the same pipeline with those inputs and records the method `manual_corrected`. The fully automatic result for the same image and ROI is computed and stored separately in `auto_result`, and an audit event records both values.
+* **Three points** (method `manual_three_point`) computes θ with no image analysis. The operator clicks the start and end of the drop where it touches the surface and the top of the drop; a magnifier helps placement. The baseline is the line through start and end, so tilt needs no correction. The angle comes from the circle through the three points: in the baseline frame, v_c = ((u_top − u_mid)² + v_top² − (w/2)²) / (2 v_top) and θ = arccos(−v_c / R). With the top point centred this is the half-angle formula θ = 2 arctan(2h / w). It assumes a spherical cap, so θ_L = θ_R by construction and heavily gravity-flattened drops are outside its validity. A diagnostic reports how far the angle moves if the points move 2 px; precision depends on placement.
 * **Manual tangent** mode computes θ from user-placed contact and tangent points only: θ = atan2(t_v, ±t_u) in the baseline frame. Used when segmentation is impossible (e.g. very low contrast).
 * Re-analysis of a saved record (PATCH) keeps the previous values in the audit history; the original image is never modified.
 

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AnnotationCanvas, type Handles } from "@/components/AnnotationCanvas";
+import { AnnotationCanvas, nextPoint, type Handles } from "@/components/AnnotationCanvas";
 import { CameraPanel } from "@/components/CameraPanel";
 import { classifyCameraError } from "@/hooks/useCamera";
 
@@ -103,3 +103,26 @@ describe("AnnotationCanvas manual correction", () => {
     expect(screen.getAllByRole("button", { name: /tangent point/ })).toHaveLength(2);
   });
 });
+
+describe("three-point placement", () => {
+  it("places start, end and top in order from clicks and then stops placing", () => {
+    let h: Handles = { baseline: [[0, 0], [320, 0]] };
+    const onChange = vi.fn((n: Handles) => { h = n; });
+    const view = render(<AnnotationCanvas src="blob:x" width={320} height={200} handles={h} onHandlesChange={onChange} mode="three_point" roi={null} roiDrawing={false} />);
+    const svg = view.container.querySelector("svg")!;
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 320, height: 200 }) as DOMRect;
+    const click = (x: number, y: number) => {
+      fireEvent.pointerDown(svg, { clientX: x, clientY: y });
+      view.rerender(<AnnotationCanvas src="blob:x" width={320} height={200} handles={h} onHandlesChange={onChange} mode="three_point" roi={null} roiDrawing={false} />);
+    };
+    click(100, 150);
+    expect(nextPoint(h)?.step).toBe(2);
+    click(220, 150);
+    click(160, 90);
+    expect(h).toMatchObject({ contact_left: [100, 150], contact_right: [220, 150], apex: [160, 90] });
+    expect(nextPoint(h)).toBeNull();
+    click(10, 10);
+    expect(onChange).toHaveBeenCalledTimes(3);
+  });
+});
+

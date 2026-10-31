@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Crop, Download, RotateCcw, ScanLine, Wand2, XCircle } from "lucide-react";
+import { ArrowLeft, Crop, Crosshair, Download, RotateCcw, ScanLine, Wand2, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnnotationCanvas, type Handles } from "@/components/AnnotationCanvas";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnnotationCanvas, nextPoint, type Handles } from "@/components/AnnotationCanvas";
 import { CameraPanel } from "@/components/CameraPanel";
 import { SpecimenPicker } from "@/components/SpecimenPicker";
 import { Alert, Badge, Button, Card, EmptyState, Field, Input, LabeledInput, OriginBadge, PageHeader, Select, StatusDot, Table, Textarea } from "@/components/ui";
@@ -16,7 +16,7 @@ import { isStaticDemo } from "@/lib/mode";
 import { CA_NOTE, classTone } from "@/lib/wettability";
 
 type Shot = Capture & { source: "camera" | "upload"; filename: string };
-type Opts = { mode: "auto" | "manual_tangent"; threshold: number | null; polarity: "auto" | "dark_drop" | "light_drop"; fit_radius_px: number | null; primary_method: "polynomial" | "circle" };
+type Opts = { mode: "auto" | "manual_tangent" | "three_point"; threshold: number | null; polarity: "auto" | "dark_drop" | "light_drop"; fit_radius_px: number | null; primary_method: "polynomial" | "circle" };
 
 
 function defaultHandles(w: number, h: number): Handles {
@@ -51,6 +51,7 @@ export default function WettabilityPage() {
   const [autoResult, setAutoResult] = useState<CAResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const latest = useRef(0); // only the newest request may change the page, so a slow result cannot overwrite placed points
   const hosted = isStaticDemo();
   const recent = useApi<CARun[]>(hosted ? null : "/api/wettability/measurements?limit=8");
 
@@ -59,7 +60,9 @@ export default function WettabilityPage() {
     if (r) p.roi = r;
     if (o.threshold !== null) p.threshold = o.threshold;
     if (o.fit_radius_px) p.fit_radius_px = o.fit_radius_px;
-    if (h && (corr || o.mode === "manual_tangent")) {
+    if (o.mode === "three_point") {
+      Object.assign(p, { contact_left: h?.contact_left, contact_right: h?.contact_right, apex: h?.apex });
+    } else if (h && (corr || o.mode === "manual_tangent")) {
       p.baseline = h.baseline;
       p.contact_left = h.contact_left;
       p.contact_right = h.contact_right;
@@ -69,18 +72,20 @@ export default function WettabilityPage() {
   }, []);
 
   const analyse = useCallback(async (s: Shot, o: Opts, h: Handles | null, corr: boolean, r: typeof roi) => {
+    const run = ++latest.current;
     setBusy(true);
     setErr(null);
     try {
       const res = await api<CAResult>("/api/wettability/analyze", { method: "POST", body: form({ image: [s.blob, s.filename], params: JSON.stringify(params(o, h, corr, r)) }) });
-      setResult(res);
       if (!res.manual_correction && o.mode === "auto") setAutoResult(res);
       else if (res.auto_result) setAutoResult((a) => a ?? res.auto_result!);
+      if (run !== latest.current) return;
+      setResult(res);
       if (!corr && o.mode === "auto") setHandles(handlesFrom(res, s.width, s.height));
     } catch (e) {
-      setErr((e as Error).message);
+      if (run === latest.current) setErr((e as Error).message);
     } finally {
-      setBusy(false);
+      if (run === latest.current) setBusy(false);
     }
   }, [params]);
 
@@ -90,6 +95,23 @@ export default function WettabilityPage() {
     setShot(s); setOpts(o); setRoi(null); setCorrected(false); setResult(null); setAutoResult(null); setHandles(null);
     analyse(s, o, null, false, null);
   };
+
+  const startPoints = () => {
+    if (!shot) return;
+    latest.current++;
+    setBusy(false);
+    setOpts({ ...opts, mode: "three_point" });
+    setHandles({ baseline: defaultHandles(shot.width, shot.height).baseline });
+    setResult(null);
+    setRoiDrawing(false);
+  };
+
+  // three-point mode has nothing to wait for: the angle follows the points
+  useEffect(() => {
+    if (!shot || opts.mode !== "three_point" || nextPoint(handles)) return;
+    const t = setTimeout(() => analyse(shot, opts, handles, true, roi), 200);
+    return () => clearTimeout(t);
+  }, [shot, opts, handles, roi, analyse]);
 
   const discard = () => {
     if (shot) URL.revokeObjectURL(shot.url);
@@ -123,13 +145,20 @@ export default function WettabilityPage() {
                   roi={roi} roiDrawing={roiDrawing} onRoi={(r) => { setRoi(r); setRoiDrawing(false); }}
                   labels={result?.mean_deg != null ? { left: `θL ${fmtDeg(result.left_deg)}`, right: `θR ${fmtDeg(result.right_deg)}` } : undefined}
                 />
-                <p className="text-xs text-muted">
+                {opts.mode === "three_point" ? (
+                  <div role="status" className="rounded-md border border-accent/50 bg-panel-2 px-3 py-2 text-sm text-ink">
+                    {nextPoint(handles) ? <>Click {nextPoint(handles)!.step} of 3: {nextPoint(handles)!.prompt}.</> : <>Angle calculated from your points. Drag any point to fine-tune, or focus one and use the arrow keys (1 px). The baseline runs through Start and End.</>}
+                  </div>
+                ) : <p className="text-xs text-muted">
                   <span className="text-accent">●</span> baseline · <span className="text-warn">●</span> contact points · <span className="text-pred">●</span> tangent points (manual tangent mode) ·
                   <span className="text-good"> —</span> detected boundary · drag handles or focus one and use the arrow keys.
-                </p>
+                </p>}
                 <div className="flex flex-wrap gap-2">
                   <Button variant="primary" icon={<ScanLine className="size-4" />} busy={busy} onClick={() => analyse(shot, opts, handles, corrected, roi)}>
                     {corrected || opts.mode === "manual_tangent" ? "Re-analyse with corrections" : "Re-analyse"}
+                  </Button>
+                  <Button icon={<Crosshair className="size-4" />} variant={opts.mode === "three_point" ? "primary" : "secondary"} onClick={startPoints}>
+                    {opts.mode === "three_point" ? "Start points again" : "Place 3 points"}
                   </Button>
                   <Button icon={<Crop className="size-4" />} variant={roiDrawing ? "primary" : "secondary"} onClick={() => setRoiDrawing((d) => !d)}>
                     {roiDrawing ? "Drag a rectangle…" : roi ? "Redraw ROI" : "Select ROI"}
@@ -145,8 +174,15 @@ export default function WettabilityPage() {
                   <summary className="cursor-pointer text-sm font-medium text-ink-2">Analysis settings</summary>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                     <Field label="Mode">
-                      <Select value={opts.mode} aria-label="Analysis mode" onChange={(e) => { const mode = e.target.value as Opts["mode"]; setOpts({ ...opts, mode }); if (mode === "manual_tangent" && !handles) setHandles(defaultHandles(shot.width, shot.height)); }}>
+                      <Select value={opts.mode} aria-label="Analysis mode" onChange={(e) => {
+                        const mode = e.target.value as Opts["mode"];
+                        if (mode === "three_point") return startPoints();
+                        const stale = opts.mode === "three_point" || !handles;
+                        setOpts({ ...opts, mode });
+                        if (stale) setHandles(autoResult ? handlesFrom(autoResult, shot.width, shot.height) : defaultHandles(shot.width, shot.height));
+                      }}>
                         <option value="auto">Automatic / corrected fit</option>
+                        <option value="three_point">Three points (start, end, top)</option>
                         <option value="manual_tangent">Manual tangent (operator points)</option>
                       </Select>
                     </Field>
@@ -230,7 +266,7 @@ function ResultPanel({ result, auto, busy }: { result: CAResult | null; auto: CA
           )}
         </div>
       ) : (
-        <Alert tone="bad" title="No reliable angle">{result.errors.join(" ")} Adjust the ROI, threshold or baseline, or switch to manual tangent mode.</Alert>
+        <Alert tone="bad" title="No reliable angle">{result.errors.join(" ")} Press Place 3 points to get the angle from your own clicks, or adjust the ROI, threshold or baseline.</Alert>
       )}
       {result.warnings.length > 0 && <div className="mt-3 flex flex-col gap-1.5">{result.warnings.map((w) => <Alert key={w} tone="warn">{w}</Alert>)}</div>}
       <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-muted">Quality diagnostics</h3>
