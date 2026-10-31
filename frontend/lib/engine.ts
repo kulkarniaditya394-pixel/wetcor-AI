@@ -70,7 +70,7 @@ export async function engineCall<T>(fn: string, args: Record<string, unknown> = 
 }
 
 /** Map the app's REST paths onto engine functions so existing pages work unchanged in the hosted site. */
-export async function engineRoute(path: string, init: { method?: string; body?: BodyInit | null }): Promise<{ value: unknown }> {
+export async function engineRoute(path: string, init: { method?: string; body?: BodyInit | null; json?: unknown }): Promise<{ value: unknown }> {
   const method = (init.method ?? "GET").toUpperCase();
   const route = path.split("?")[0];
   const fd = init.body instanceof FormData ? init.body : null;
@@ -83,6 +83,8 @@ export async function engineRoute(path: string, init: { method?: string; body?: 
     const v = fd?.get(key);
     return typeof v === "string" && v ? JSON.parse(v) : undefined;
   };
+  if (method === "POST" && route === "/api/corrosion/rig/parse") return { value: await engineCall("rig_parse", init.json as Record<string, unknown>) };
+  if (method === "POST" && route === "/api/corrosion/rig/analyze") return { value: await engineCall("rig_analyze", init.json as Record<string, unknown>) };
   if (method === "POST" && route === "/api/wettability/analyze") {
     const { buf } = await file("image");
     return { value: await engineCall("wettability_analyze", { params: json("params") ?? {} }, buf) };

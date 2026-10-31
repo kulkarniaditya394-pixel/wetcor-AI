@@ -47,6 +47,9 @@ All endpoints are served on the loopback interface only. Errors are JSON `{"deta
 |---|---|---|---|---|
 | `GET` | `/api/corrosion/methods` | Methods |  |  |
 | `POST` | `/api/corrosion/import/preview` | Preview |  | Body_preview_api_corrosion_import_preview_post |
+| `POST` | `/api/corrosion/quick` | Quick Analysis |  | Body_quick_analysis_api_corrosion_quick_post |
+| `POST` | `/api/corrosion/rig/parse` | Rig Parse |  | application/json |
+| `POST` | `/api/corrosion/rig/analyze` | Rig Analyze |  | application/json |
 | `POST` | `/api/corrosion/import` | Import Run |  | Body_import_run_api_corrosion_import_post |
 | `POST` | `/api/corrosion/runs/{run_id}/analyze` | Analyze Run | `run_id`* | AnalyzeRequest |
 | `GET` | `/api/corrosion/runs` | List Runs | `specimen_id`, `experiment_id`, `method`, `include_demo`, `limit` |  |

@@ -104,7 +104,7 @@ def test_contact_angle_flow_with_correction_history(client):
 
 def test_failed_analysis_cannot_be_accepted_but_can_be_rejected(client):
     s = make_specimen(client)
-    img, _ = synthetic_drop(60, background=120, foreground=116)
+    img, _ = synthetic_drop(60, background=120, foreground=120, noise_sigma=3)
     data = encode_png(img)
     meta = {"specimen_id": s["id"], "status": "accepted"}
     r = client.post("/api/wettability/measurements", files={"image": ("c.png", data, "image/png")}, data={"meta": json.dumps(meta)})

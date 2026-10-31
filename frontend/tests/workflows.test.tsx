@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import CorrosionPage from "@/app/corrosion/page";
 import MLStudio from "@/app/ml-studio/page";
 import { ExperimentForm, SpecimenForm } from "@/components/RecordForms";
+import { RigPanel } from "@/components/RigPanel";
 import { mockFetch } from "./helpers";
 
 const specimens = { items: [{ id: 1, code: "MS-01", material: "Mild steel", exposed_area_cm2: 1 }], total: 1, page: 1, page_size: 500 };
@@ -69,6 +70,7 @@ describe("corrosion import wizard", () => {
       "POST /api/corrosion/import": (init?: RequestInit) => { imported = JSON.parse(String((init?.body as FormData).get("meta"))); return { id: 12 }; },
     });
     render(<CorrosionPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Potentiostat file upload" }));
     expect(screen.getByText("Awaiting file")).toBeInTheDocument();
     const input = screen.getByLabelText("Choose measurement file");
     fireEvent.change(input, { target: { files: [new File(["E,I\n-650,1.2"], "lpr.csv", { type: "text/csv" })] } });
@@ -114,5 +116,34 @@ describe("ML studio", () => {
     fireEvent.click(btn);
     const alert = await screen.findByText("Training refused");
     expect(within(alert.closest("[role=alert]") as HTMLElement).getByText(/Target leakage/)).toBeInTheDocument();
+  });
+});
+
+describe("Arduino rig panel", () => {
+  const parsed = { n_cycles: 1, readings: { good_current_a: 0.145, corroded_current_a: 0.153, current_diff_a: 0.009 }, spread: {}, device_result: "HEALTHY ELECTRODE", device_verdict: "healthy", unrecognised_lines: [], missing: [], warnings: [] };
+  const analysed = { device_result: "HEALTHY ELECTRODE", device_verdict: "healthy", n_cycles: 1, comparison: "no_difference", comparison_text: "The 9.0 mA difference is smaller than one ADC step.", agrees_with_device: true,
+    currents: { good_a: 0.145, corroded_a: 0.153, delta_a: 0.009, delta_percent: 6.2, calibrated: false }, resolution: { adc_step_a: 0.026, floor_a: 0.026, resolved: false }, sensor: { variant: "ACS712-05B (5 A)" },
+    checks: [{ key: "adc_step", label: "One ADC step equals", value: "26.4 mA", status: "warn", note: "" }], metrics: [], needs: ["exposed electrode area", "material"], warnings: [], notes: [], severity: null };
+
+  it("reads pasted Serial Monitor text, fills the values and shows the verdict without asking for a file", async () => {
+    let parseBody: Record<string, unknown> = {};
+    mockFetch({ "GET /api/materials": [], "POST /api/corrosion/rig/parse": (init?: RequestInit) => { parseBody = JSON.parse(String(init?.body)); return parsed; }, "POST /api/corrosion/rig/analyze": analysed });
+    render(<RigPanel />);
+    fireEvent.change(screen.getByLabelText("Arduino Serial Monitor output"), { target: { value: ["Good current: 0.145 A", "Corroded current: 0.153 A", "RESULT: HEALTHY ELECTRODE"].join("\n") } });
+    expect(await screen.findByText("HEALTHY ELECTRODE", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(parseBody.text).toContain("Good current");
+    expect(screen.getByLabelText(/^Good current/)).toHaveValue(0.145);
+    expect(screen.getByText("WETCOR check agrees")).toBeInTheDocument();
+    expect(screen.getByText(/smaller than one ADC step/)).toBeInTheDocument();
+    expect(screen.getByText(/Enter the exposed electrode area and material/)).toBeInTheDocument();
+  });
+
+  it("works from typed values with no paste", async () => {
+    let body: Record<string, unknown> = {};
+    mockFetch({ "GET /api/materials": [], "POST /api/corrosion/rig/analyze": (init?: RequestInit) => { body = JSON.parse(String(init?.body)); return analysed; } });
+    render(<RigPanel />);
+    fireEvent.change(screen.getByLabelText(/^Good current/), { target: { value: "0.145" } });
+    fireEvent.change(screen.getByLabelText(/^Corroded current/), { target: { value: "0.153" } });
+    await waitFor(() => expect(body.readings).toMatchObject({ good_current_a: 0.145, corroded_current_a: 0.153 }), { timeout: 2000 });
   });
 });

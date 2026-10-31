@@ -1,7 +1,7 @@
 # Scientific methods and assumptions
 
 This document describes exactly what WETCOR AI computes. Version identifiers stored with every result:
-contact-angle algorithm `ca-1.0.0`, electrochemistry methods `ec-1.0.0`.
+contact-angle algorithm `ca-2.0.0`, electrochemistry methods `ec-1.0.0`, Arduino rig analysis `rig-1.0.0`.
 
 All limits referred to below are **software quality-control settings** (Settings page, `app_settings` table).
 Each saved result records the limits in force when it was computed.
@@ -15,27 +15,38 @@ The browser captures a full-resolution frame from the selected camera (`getUserM
 frame is sent to the local backend only when the user presses *Capture & Analyse* / *Re-analyse* / *Save*.
 The saved original is byte-identical to the captured PNG; its SHA-256 is stored and re-verified on every read.
 
-### 1.2 Pipeline (`backend/app/services/wettability/detection.py`)
-1. **Validation** – decodes PNG/JPEG/BMP/TIFF; rejects images < 32 px per side or > 50 MP; 16-bit images are scaled to 8 bit.
+### 1.2 Pipeline (`backend/app/services/wettability/detection.py`, `proposals.py`)
+Automatic detection is a search, not a single recipe: several ways of finding the drop are combined with several ways of finding the surface, each combination is measured with the same geometry, and the best supported one is reported. An image that shows no measurable drop still fails with a clear message: an angle is never returned just because some contour exists.
+
+1. **Validation** – decodes PNG/JPEG/BMP/TIFF, applying the orientation tag that phones write; rejects images < 32 px per side or > 50 MP; 16-bit images are scaled to 8 bit.
 2. **ROI** – optional user rectangle; all coordinates are reported in full-image pixels.
-3. **Segmentation** – 5×5 Gaussian blur, global threshold (Otsu unless the user sets one), polarity auto-detected from the top rows (dark drop on light background for back-lit shadowgraphs), 3×3 morphological opening. Contrast = |mean(background) − mean(foreground)| in grey levels.
-4. **Baseline** – either user-placed (two points) or automatic: the top foreground pixel of every column in the outer 12 % of the ROI on each side (the opaque specimen) is fitted with a straight line, with iterative outlier rejection (MAD). Detection fails if the surface is not visible on both sides, is not straight (RMS > 2 px) or no droplet rises above it.
+3. **Working image** – photographs are resized so the long side is at most 1600 px, tiny images are enlarged up to 3×, and coloured labels or lines from other software are painted out of the working copy. All coordinates are mapped back to the original image.
+4. **Foreground and baseline proposals** –
+   * *Foreground fields*: global threshold (Otsu unless the user sets one; polarity from the top rows), colour distance from a fitted smooth background (handles vignettes, gradients and colour), and the region enclosed by strong edges (transparent drops).
+   * *Baselines, in order of trust*: the specimen surface as a straight two-sided brightness step across the image (averaging along the line makes it indifferent to grain, scratches and roughness), the top profile of the foreground fitted by RANSAC, the mirror axis between a drop and its reflection, a flat lower edge of the drop, and long straight edges.
+   * *Traced outline*: edge normals of a circle meet at its centre, so pairs of edge points vote for circles that pass over their own top. The real boundary is then followed around each circle as the smoothest strong path, re-centring the circle on each pass, so refraction rims inside a transparent drop cannot pull single rays off course. The baseline for an outline is the lowest two-sided surface step that the outline comes down to, else the line through the ends of the outline.
+   * *Scoring*: each candidate is scored on how the baseline was found (surface on both sides > mirror or flat edge > strongest edge), the circle residual, left-right agreement, local-tangent versus circle agreement, how much of the outline is really visible and how much of the drop base is extrapolated. A baseline with the outline visibly continuing below it is penalised, because it cuts through the drop. A surface line on both sides of a well-shaped drop ends the search early. The search is deterministic: the same image and engine always give the same result.
+   * *Rotation*: if nothing is found the right way up, the image is tried turned by 90/180/270°, and that is accepted only on strong evidence.
 5. **Baseline frame** – every pixel is expressed as (u, v): u along the baseline (left→right), v perpendicular, positive towards the droplet. Image y points down; the frame handles this and any tilt up to 45°.
-6. **Droplet region** – the largest connected foreground component lying > 1.5 px above the baseline and touching it. A component touching the left/right ROI border is refused (clipped droplet, or baseline below the surface if both sides are touched). Touching the top border disables the circle fit (clipped apex or dispensing needle).
-7. **Boundary** – external contour, then each point is moved to the sub-pixel location where the blurred intensity crosses the threshold along the local intensity gradient (bilinear sampling ±2.5 px). Points within `exclude_px` (default 3 px) of the baseline are excluded from fitting because blur rounds the drop/substrate corner.
+6. **Droplet region** – the largest connected foreground component lying above the baseline and touching it, after a small opening that cuts slivers of rough surface. A dispensing needle (a narrow stem running down from the top) is ignored in the fits. A component touching the left/right ROI border is refused (clipped droplet, or baseline below the surface if both sides are touched). Touching the top border raises a warning. Boundaries that are not shaped like a droplet (circle residual above 8 % of the radius, or almost flat) are rejected.
+7. **Boundary** – external contour, then each point is moved to the sub-pixel location where the blurred intensity crosses the threshold (or to the steepest edge for the edge field) along the local intensity gradient (bilinear sampling ±2.5 px). Traced outlines are already sub-pixel. Points within `exclude_px` (default 3 px) of the baseline are excluded from fitting because blur rounds the drop/substrate corner.
 8. **Contact points** – initial estimates are the extreme u of droplet pixels within 4.5 px of the baseline (or user-placed points); they are refined by the fits.
 9. **Local tangent (default reported method)** – for each side, boundary points within the fitting radius (default 20 % of the droplet's maximum width, 12–600 px) are rotated into their principal-axis frame and fitted with a quadratic t = q(s). The fitted curve is intersected with the baseline (v = 0) and differentiated there. Fitting in the rotated frame keeps the problem well conditioned from very low to very high angles.
-10. **Spherical-cap fit** – algebraic (Kåsa) circle fit refined by geometric least squares on all free boundary points. θ = arccos(−v_c / R), where v_c is the centre height above the baseline. The fit is *rejected* if the circle does not intersect the baseline, if RMS residual / R exceeds `circle_max_rel_rms` (1.5 %), or if its baseline intersections disagree with the local-tangent contact points by more than max(3 px, 3 % of contact width).
+10. **Spherical-cap fit** – algebraic (Kåsa) circle fit refined by geometric least squares on the free boundary points, with up to three rounds of outlier trimming. For a traced outline this is the reported method, because few boundary points survive near the contact line. θ = arccos(−v_c / R), where v_c is the centre height above the baseline. The fit is *rejected* if the circle does not intersect the baseline, if RMS residual / R exceeds `circle_max_rel_rms` (1.5 %), or if its baseline intersections disagree with the local-tangent contact points by more than max(3 px, 3 % of contact width).
 11. **Angle convention** – the angle inside the liquid between the baseline (pointing into the drop) and the tangent; left and right are measured independently (θ_L uses the +u direction, θ_R the −u direction), so they are never swapped and asymmetric drops are reported as such.
 12. **Waist check** – an interior minimum of droplet width above the baseline indicates that a reflection is included below the real contact line; a warning and a suggested baseline are returned.
-13. **Status** – `failed` (no angle; explicit error), `needs_correction` (an angle exists but a diagnostic failed, e.g. |θ_L − θ_R| > 10°), or `ok`.
+13. **Status** – `failed` (no angle; explicit error), `needs_correction` (an angle exists but a diagnostic failed, e.g. |θ_L − θ_R| > 10°, or the evidence is low), or `ok`.
+14. **Detection evidence** – `high` needs a surface seen on both sides and a clearly visible outline; `medium` means part of the outline or surface is unclear, and a warning asks the user to confirm the overlay; `low` always means `needs_correction`. This is a heuristic statement about the image, not an uncertainty.
 
-### 1.3 Manual correction
+### 1.3 Measured performance
+See [CONTACT_ANGLE_EVALUATION.md](CONTACT_ANGLE_EVALUATION.md). This is a geometric algorithm developed and tested against rendered images and published photographs. It is not a trained neural network.
+
+### 1.4 Manual correction
 * Moving the baseline or contact points, changing threshold, polarity or fitting radius re-runs the same pipeline with those inputs and records the method `manual_corrected`. The fully automatic result for the same image and ROI is computed and stored separately in `auto_result`, and an audit event records both values.
 * **Manual tangent** mode computes θ from user-placed contact and tangent points only: θ = atan2(t_v, ±t_u) in the baseline frame. Used when segmentation is impossible (e.g. very low contrast).
 * Re-analysis of a saved record (PATCH) keeps the previous values in the audit history; the original image is never modified.
 
-### 1.4 Quality indicators
+### 1.5 Quality indicators
 Saturated-pixel fraction, contrast, baseline fit RMS and tilt, number of boundary points, local-fit RMS per side, circle residual/R, left–right difference, local-tangent vs circle agreement, manual-correction flag and reported method. **These are heuristic diagnostics, not a calibrated measurement uncertainty.** Repeatability must be established from repeated drops (report mean ± SD of independent drops in the project report).
 
 ### 1.5 Classification
@@ -80,6 +91,18 @@ Nyquist (−Z″ vs Z′), Bode |Z| and phase. Checks: positive frequencies (els
 
 ### 2.7 Verification
 `backend/tests/test_electrochemistry.py` checks unit conversions and the CR formula by hand calculation, R_p against the analytic Butler–Volmer value B/i_corr (2 %), Tafel recovery of β_a = 60 mV/dec, β_c = 120 mV/dec, i_corr = 5 µA/cm² (3–5 %), refusal of unsuitable curves, OCP refusal, EIS |Z| against the analytic Randles–CPE value, parser behaviour on comma/tab/semicolon/decimal-comma/whitespace files and malformed inputs.
+
+---
+
+## 2A. Arduino rig (`backend/app/services/electrochemistry/arduino.py`)
+
+The rig compares a good and a corroded electrode with ACS712 Hall current sensors and LM393 modules on a 10-bit Arduino ADC. **It is not a potentiostat:** it does not sweep potential, so i_corr, Tafel slopes and R_p cannot be obtained from it, and none are reported.
+
+* **Parsing** – Serial Monitor text is read line by line (timestamps ignored, mV and mA scaled, bare verdict lines accepted). Repeated cycles are averaged and their real scatter is reported. Lines that are not understood are listed, never guessed.
+* **Resolution** – one ADC step is 4.888 mV at 5 V, which is 26.4 mA for the 185 mV/A sensor. The ACS712-05B datasheet gives about 21 mV peak-to-peak noise at 2 kHz, about 114 mA. The sensor variant is identified from the printed numbers. A difference below the resolution floor is reported as "no difference", which is what the device's HEALTHY verdict is checked against.
+* **Faraday estimate (Calculated)** – CR [mm/y] = 0.00327 · (I/A) [µA/cm²] · EW / ρ. It assumes that all of the measured current dissolves metal from the stated area, so it is an upper bound, shown with a range from the sensor resolution. A value far above natural corrosion currents is flagged as driven current.
+* **Weight loss (Calculated from measured masses)** – CR [mm/y] = 8.76×10⁴ · W / (A · T · D), the ASTM G31 form, with W in g, A in cm², T in h and D in g/cm³. This is the reliable rate for this rig and the only one that gets a severity class (NACE SP0775 bands).
+* **Area and material are never defaulted.** Without them no rate is shown. Rig metrics use `rig_` names, so they are never mixed with potentiostat values or ML targets.
 
 ---
 

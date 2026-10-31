@@ -14,6 +14,7 @@ import numpy as np
 from app.core import defaults as D
 from app.core.serial import clean
 from app.services.electrochemistry import analysis as A
+from app.services.electrochemistry import arduino as RIG
 from app.services.electrochemistry import materials as MAT
 from app.services.electrochemistry.parser import ParseError, parse_table, suggest_mapping
 from app.services.electrochemistry.units import CANONICAL, FACTORS, UnitError
@@ -74,6 +75,22 @@ def resolve_material(material: dict | None) -> dict | None:
     if not any(mat.get(k) is not None for k in ("equivalent_weight_g_eq", "density_g_cm3")):
         return None
     return mat
+
+
+def rig_parse(text: str) -> dict:
+    try:
+        return clean(RIG.parse_output(text))
+    except RIG.RigError as exc:
+        raise QuickError(422, str(exc)) from None
+
+
+def rig_analyze(body: dict) -> dict:
+    """Arduino rig: consistency and resolution checks, verdict comparison, Faraday and weight-loss rates."""
+    try:
+        return clean(RIG.analyze_rig(body.get("readings") or {}, body.get("settings"), spread=body.get("spread"), n_cycles=int(body.get("n_cycles") or 1),
+                                     device_result=body.get("device_result"), device_verdict=body.get("device_verdict"), material=resolve_material(body.get("material"))))
+    except (RIG.RigError, A.AnalysisError, TypeError, ValueError) as exc:
+        raise QuickError(422, str(exc)) from None
 
 
 def plot_data(df) -> dict:

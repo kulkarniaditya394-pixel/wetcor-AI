@@ -25,6 +25,10 @@ def dispatch(fn: str, args_json: str = "{}", blob: bytes | None = None) -> str:
             out = quick.corrosion_methods()
         elif fn == "corrosion_preview":
             out = quick.corrosion_preview(blob or b"", args.get("filename", ""))
+        elif fn == "rig_parse":
+            out = quick.rig_parse(args.get("text", ""))
+        elif fn == "rig_analyze":
+            out = quick.rig_analyze(args)
         elif fn == "corrosion_quick":
             out = quick.corrosion_quick(blob or b"", args["meta"], args.get("params"), args.get("material"), args.get("reference_electrode"))
         else:

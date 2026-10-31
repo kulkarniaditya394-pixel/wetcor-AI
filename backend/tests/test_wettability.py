@@ -117,8 +117,14 @@ def test_low_contrast_warns_but_measures():
     assert r["mean_deg"] == pytest.approx(75, abs=2.0)
 
 
-def test_very_low_contrast_refuses_and_manual_tangent_recovers():
-    img, truth = synthetic_drop(65, background=120, foreground=114, noise_sigma=2)
+def test_barely_visible_drop_is_measured_or_refused_never_wrong():
+    img, _ = synthetic_drop(65, background=120, foreground=114, noise_sigma=2)
+    r = analyze(encode_png(img))
+    assert r["mean_deg"] is None or r["mean_deg"] == pytest.approx(65, abs=3.0)
+
+
+def test_invisible_drop_refuses_and_manual_tangent_recovers():
+    img, truth = synthetic_drop(65, background=120, foreground=119, noise_sigma=3)
     data = encode_png(img)
     auto = analyze(data)
     assert auto["status"] == "failed" and auto["mean_deg"] is None
@@ -155,10 +161,9 @@ def test_insufficient_contour_points_fails():
     assert r["status"] == "failed" and r["mean_deg"] is None
 
 
-def test_floating_object_without_baseline_requests_manual_baseline():
+def test_drop_without_a_substrate_block_is_still_measured():
     r, _ = run(100, substrate=False)
-    assert r["status"] == "failed"
-    assert any("baseline" in e.lower() for e in r["errors"])
+    assert r["mean_deg"] == pytest.approx(100, abs=TOL)
 
 
 def test_manual_baseline_is_recorded_as_correction():

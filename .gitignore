@@ -37,4 +37,7 @@ models/*
 # showcase example (public image + synthetic electrochemistry)
 !data/showcase/
 
+# openly licensed images with published angles, used to measure the detector
+!data/validation/
+
 frontend/out/

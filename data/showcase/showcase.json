@@ -44,7 +44,7 @@
       "roi": [60, 110, 400, 220],
       "baseline": [[0, 299], [514, 299]]
     },
-    "correction_reason": "Automatic baseline detection fails because the reflective surface mirrors the drop; the baseline was placed on the mirror axis (narrowest row, y = 299 px) between the drop and its reflection.",
+    "correction_reason": "The reflective surface mirrors the drop, which makes the contact line hard to place automatically; the baseline was placed by hand on the mirror axis (narrowest row, y = 299 px) between the drop and its reflection.",
     "reference": {
       "source": "Reading of the instrument's own software visible in the original frame (Young-Laplace fit)",
       "left_deg": 114.95,

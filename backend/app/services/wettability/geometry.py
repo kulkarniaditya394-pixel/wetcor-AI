@@ -105,6 +105,21 @@ def fit_circle(uv: np.ndarray) -> CircleFit:
     return CircleFit(float(uc), float(vc), float(abs(r)), float(np.sqrt(np.mean(res.fun**2))))
 
 
+def fit_circle_robust(uv: np.ndarray, rounds: int = 3) -> tuple[CircleFit, float]:
+    """Circle fit that ignores boundary outliers (specks, reflections, needle remnants). Returns the fit and the inlier fraction."""
+    uv = np.asarray(uv, dtype=float)
+    keep = np.ones(len(uv), bool)
+    for _ in range(rounds):
+        cf = fit_circle(uv[keep])
+        r = np.abs(np.hypot(uv[:, 0] - cf.uc, uv[:, 1] - cf.vc) - cf.r)
+        sigma = max(1.4826 * float(np.median(r[keep])), 0.5)
+        new = r < 2.5 * sigma
+        if new.sum() < max(5, 0.5 * len(uv)) or (new == keep).all():
+            break
+        keep = new
+    return fit_circle(uv[keep]), float(keep.mean())
+
+
 @dataclass
 class SideFit:
     side: str
@@ -131,6 +146,11 @@ def fit_side_tangent(points_uv: np.ndarray, contact_u_est: float, side: str, deg
     e1, e2 = vt[0], np.array([-vt[0][1], vt[0][0]])
     s, t = (pts - centre) @ e1, (pts - centre) @ e2
     q = np.polyfit(s, t, degree)
+    res = np.abs(np.polyval(q, s) - t)
+    keep = res <= max(0.8, 2.5 * 1.4826 * float(np.median(res)))  # one trim pass drops specks without bending the fit
+    if keep.sum() >= degree + 3:
+        s, t, pts = s[keep], t[keep], pts[keep]
+        q = np.polyfit(s, t, degree)
     rms = float(np.sqrt(np.mean((np.polyval(q, s) - t) ** 2)))
     # v(s) = centre_v + s*e1_v + q(s)*e2_v ; solve v(s) = 0
     v_poly = q * e2[1]

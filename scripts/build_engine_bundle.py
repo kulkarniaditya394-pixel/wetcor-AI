@@ -17,9 +17,9 @@ FILES = [
     "__init__.py", "browser_engine.py",
     "core/__init__.py", "core/defaults.py", "core/serial.py",
     "services/__init__.py", "services/quick.py",
-    "services/wettability/__init__.py", "services/wettability/geometry.py", "services/wettability/detection.py", "services/wettability/overlay.py",
+    "services/wettability/__init__.py", "services/wettability/geometry.py", "services/wettability/proposals.py", "services/wettability/detection.py", "services/wettability/overlay.py",
     "services/electrochemistry/__init__.py", "services/electrochemistry/units.py", "services/electrochemistry/parser.py",
-    "services/electrochemistry/analysis.py", "services/electrochemistry/materials.py",
+    "services/electrochemistry/analysis.py", "services/electrochemistry/materials.py", "services/electrochemistry/arduino.py",
 ]
 
 

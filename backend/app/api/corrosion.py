@@ -62,6 +62,24 @@ async def quick_analysis(file: UploadFile = File(...), meta: str = Form(...), pa
         raise HTTPException(exc.status, str(exc)) from None
 
 
+@router.post("/rig/parse")
+def rig_parse(body: dict):
+    """Read pasted Arduino Serial Monitor output."""
+    try:
+        return quick.rig_parse(str(body.get("text", "")))
+    except quick.QuickError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
+@router.post("/rig/analyze")
+def rig_analyze(body: dict):
+    """Checks and rate estimates for the Arduino rig (nothing is stored)."""
+    try:
+        return quick.rig_analyze(body)
+    except quick.QuickError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+
+
 @router.post("/import", status_code=201)
 async def import_run(file: UploadFile = File(...), meta: str = Form(...), db: Session = Depends(get_session)):
     _check_ext(file.filename)

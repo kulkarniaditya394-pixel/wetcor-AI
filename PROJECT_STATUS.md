@@ -1,14 +1,15 @@
-# PROJECT STATUS — WETCOR AI 1.0.0 (2026-10-30)
+# PROJECT STATUS — WETCOR AI 1.0.0 (2026-10-31)
 
 ## Implemented
-* **Backend** (FastAPI, SQLAlchemy/SQLite, OpenCV, SciPy, scikit-learn): 51 REST operations (docs/API.md).
-* **Wettability Lab**: camera selection/preview/capture, image upload, geometric contact-angle engine (auto baseline, sub-pixel boundary, rotated-frame local tangent, spherical-cap fit, diagnostics, waist/reflection warning), ROI, draggable/keyboard handles, manual tangent mode, `manual_corrected` with automatic result preserved, re-analysis history, rejection with reason, overlay export.
-* **Corrosion Lab**: CSV/TSV/TXT parser (encodings, delimiters, decimal comma, Gamry unit rows, metadata), import wizard with explicit units, OCP / LPR / Tafel / EIS analyses with validity flags, Stern–Geary and material-property provenance, CR formula, superseded-analysis history, raw + processed downloads.
+* **Backend** (FastAPI, SQLAlchemy/SQLite, OpenCV, SciPy, scikit-learn): 53 REST operations (docs/API.md).
+* **Wettability Lab**: camera selection/preview/capture, image upload, geometric contact-angle engine `ca-2.0.0` (multi-strategy search over drop outline and surface for imperfect photos, sub-pixel boundary, rotated-frame local tangent, spherical-cap fit, evidence tiers, diagnostics), ROI, draggable/keyboard handles, manual tangent mode, `manual_corrected` with automatic result preserved, re-analysis history, rejection with reason, overlay export.
+* **Corrosion Lab, Arduino rig**: paste Serial Monitor output or type values; parser for repeated cycles, sensor identification, ADC and noise resolution, device-verdict check, Faraday and weight-loss rates, CSV and print. Verified in a browser on the exported site with the real test output. Rig results are not saved to the database yet.
+* **Corrosion Lab, potentiostat**: CSV/TSV/TXT parser (encodings, delimiters, decimal comma, Gamry unit rows, metadata), import wizard with explicit units, OCP / LPR / Tafel / EIS analyses with validity flags, Stern–Geary and material-property provenance, CR formula, superseded-analysis history, raw + processed downloads.
 * **Experiment database**: specimens, experiments, artifacts with SHA-256, audit log, search/sort/filter/pagination, guarded deletion to trash, versioned migrations with backup.
 * **ML Studio**: readiness policy, five configurations on identical specimen-grouped folds, leakage guard, out-of-fold metrics, paired comparison with conservative interpretation, persisted hash-checked models, predictions with domain warnings.
 * **Reports**: print-ready experiment and ML reports (matplotlib SVG), 8 CSV exports.
 * **Frontend**: Next.js 16 / React 19 / Tailwind 4 dark instrument UI; research-status dashboard; grouped navigation; empty, loading, warning and error states throughout; origin badges (Measured / Calculated / Predicted / Demo); responsive to 375 px.
-* **Showcase example** (`/showcase`, `data/showcase/`): pre-computed presentation test — public goniometer frame (CC BY-SA 4.0, stand-in for steel; WETCOR 111.2° vs instrument 114.6°) + synthetic OCP/polarisation, built by the normal analysis code from an editable manifest.
+* **Showcase example** (`/showcase`, `data/showcase/`): pre-computed presentation test — public goniometer frame (CC BY-SA 4.0, stand-in for steel; WETCOR 113.5° vs instrument 114.6°) + synthetic OCP/polarisation, built by the normal analysis code from an editable manifest.
 * **Hosted site with in-browser analysis** (`netlify.toml`, `docs/NETLIFY.md`): static export; the Wettability Lab (photo → contact angle → hydrophilic/hydrophobic) and Corrosion Lab (potentiostat file → OCP/LPR/Tafel/EIS, i_corr, corrosion rate) run the same Python code in the visitor's browser via Pyodide (`frontend/public/engine`, `backend/app/services/quick.py`); plus the pre-computed Showcase. Database, saved records and ML Studio are local-app only. Verified in a browser on the exported site (65.0° hydrophilic, 112.1° hydrophobic, i_corr 7.735 µA/cm², CR 0.0897 mm/y); **Netlify deploy not yet confirmed**.
 * **Demo workspace** (explicit load/reset) and `data/demo` synthetic sample files.
 * **Windows scripts**: setup, run (health-checked, auto-rebuild), stop (own processes only).
@@ -17,18 +18,19 @@
 `setup-windows.ps1` · `run-local.ps1` (prod and `-Dev`) · `stop-local.ps1` · `pytest backend/tests` · `npm test` · `npm run typecheck` · `next build` · `scripts/generate_demo_files.py` · `scripts/export_api_docs.py`.
 
 ## Results
-* Backend tests: **88 passed, 0 failed**. Frontend tests: **30 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
+* Backend tests: **137 passed, 0 failed**. Frontend tests: **32 passed, 0 failed**. Typecheck passed. Production build **succeeded**.
 * Setup, start and stop scripts verified on this machine (stop script bug found and fixed: it previously failed to match the backend command line).
 * Details: docs/TEST_REPORT.md.
 
 ## Not tested / limitations
 * **No real hardware was tested**: no USB camera (blocked in the test browser) and no real potentiostat files. Follow docs/HARDWARE_VALIDATION.md before relying on results.
 * Showcase image is not on steel (no openly licensed side-view droplet-on-steel image exists); replace it with your own capture.
-* Contact-angle accuracy is demonstrated only on synthetic silhouettes (≤ 0.5° for 20–150°); real-world accuracy is unknown until calibrated.
-* Automatic baseline needs the opaque specimen visible on both sides of the ROI; tilted-camera reflections need a manual baseline.
+* Contact-angle accuracy is measured on rendered imperfect images and a few published photographs (docs/CONTACT_ANGLE_EVALUATION.md); accuracy on this project's own rig is unknown until calibrated. The detector was developed on those images, so unseen images may do somewhat worse.
+* Tiny annotated panels, reflections with no visible surface step and multi-drop figures remain weak; crop to one drop or place the baseline by hand.
 * No Young–Laplace (axisymmetric drop shape) fitting; large, gravity-flattened drops rely on the local-tangent method.
 * EIS equivalent-circuit fitting not implemented. Binary instrument formats (.mpr, .nox, .ids) not read.
-* No AI segmentation model (no suitable, licensed, labelled dataset identified); the geometric pipeline is the only method.
+* No AI segmentation model (no suitable, licensed, labelled dataset identified); the geometric search is the only method.
+* The Arduino rig is not a potentiostat: no i_corr from it. Its Faraday figure is an upper bound, weight loss is the reliable rate, and the ACS712 cannot resolve natural corrosion currents.
 * ML training runs synchronously (fine for hundreds of records). No validated prediction intervals.
 * Single-user, loopback-only; no authentication.
 * No Playwright end-to-end suite; component tests and a manual browser walkthrough were used.

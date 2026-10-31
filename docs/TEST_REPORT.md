@@ -4,22 +4,24 @@ Recorded 2026-10-30 on Windows 11, Python 3.11.15, Node 24.17.0. All fixtures ar
 
 | Suite | Command | Result |
 |---|---|---|
-| Backend: contact-angle geometry + pipeline | `pytest backend/tests/test_wettability.py` | 29 passed |
+| Backend: contact-angle geometry + pipeline | `pytest backend/tests/test_wettability.py` | 30 passed |
+| Backend: imperfect images and published photographs | `pytest backend/tests/test_detection_hard.py` | 25 passed |
+| Backend: Arduino rig parser and analysis | `pytest backend/tests/test_rig.py` | 23 passed |
 | Backend: electrochemistry | `pytest backend/tests/test_electrochemistry.py` | 26 passed |
 | Backend: ML | `pytest backend/tests/test_ml.py` | 10 passed |
 | Backend: database / migrations | `pytest backend/tests/test_database.py` | 4 passed |
 | Backend: API integration flows | `pytest backend/tests/test_api.py` | 13 passed |
 | Backend: showcase example | `pytest backend/tests/test_showcase.py` | 1 passed |
 | Backend: stateless/browser engine | `pytest backend/tests/test_quick.py` | 5 passed |
-| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **88 passed, 0 failed** |
-| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **30 passed, 0 failed** |
+| **Backend total** | `backend\.venv\Scripts\python -m pytest backend\tests` | **137 passed, 0 failed** |
+| Frontend unit/component | `cd frontend; npm test` (Vitest + Testing Library) | **32 passed, 0 failed** |
 | Frontend typecheck | `npm run typecheck` | passed |
 | Frontend production build | `npm run build` (Next.js 16.4.2) | passed, 14 routes |
 | Windows setup | `setup-windows.ps1` | completed (venv, pip, npm ci, DB init, build) |
 | Start / stop | `run-local.ps1`, `stop-local.ps1` | health-checked start; stop leaves 0 WETCOR processes |
 
 ## What the tests cover
-* **Contact angle**: known angles 20–150° (both fits within 1.5°), 90° boundary and repeat flag, asymmetric 70°/100° not reversed, tilted baselines ±6–8°, low contrast warns, very low contrast refused + manual tangent recovers exactly, clipped droplet, no droplet, too few points, missing substrate requests a manual baseline, manual baseline recorded as `manual_corrected`, corrupt image, original bytes unchanged, no invented uncertainty, classification at 89.9/90.0/90.04/90.1°.
+* **Contact angle**: known angles 20–150° (both fits within 1.5°), 90° boundary and repeat flag, asymmetric 70°/100° not reversed, tilted baselines ±6–8°, low contrast warns, invisible drop refused + manual tangent recovers exactly, clipped droplet, no droplet, too few points, missing substrate requests a manual baseline, manual baseline recorded as `manual_corrected`, corrupt image, original bytes unchanged, no invented uncertainty, classification at 89.9/90.0/90.04/90.1°.
 * **Electrochemistry**: unit and area conversions, unit refusal, current density, CR hand calculation, missing EW/density, B from Tafel slopes, parsers (comma, tab+units row, semicolon+decimal comma, whitespace, headerless, malformed/binary/empty), missing values and duplicates, mapping validation, OCP statistics and corrosion-rate refusal, LPR R_p vs analytic B/i_corr, B without source refused, wide window warning, missing area refused, Tafel recovery (β_a, β_c, i_corr, E_corr), auto-proposal flagged, unsuitable curve rejected, zero/negative current in semi-log, zero-crossing interpolation, EIS sign convention and |Z| vs analytic Randles-CPE, non-positive frequency refused.
 * **ML**: MAE/RMSE/R² hand values and undefined R², leakage and invalid-target rejection, readiness levels incl. demo, grouped folds (each specimen held out exactly once), reproducibility with fixed seed, preprocessing fitted on training folds only (encoder categories and scaler means), model persistence, tamper and path-escape refusal, unknown categories / missing / out-of-range warnings, training refused when not ready.
 * **Database**: persistence across restart, unique codes, foreign keys, migration applied once with backup, unversioned database refused.
@@ -35,7 +37,7 @@ Specimen and experiment creation; canvas-drawn 75° droplet uploaded → 75.0° 
 * Playwright end-to-end tests (component tests + manual browser run used instead).
 
 ## Showcase example
-Loaded from the UI and checked in the browser: inputs, source frame with attribution, WETCOR overlay, 111.2° (L 112.6°, R 109.9°, `manual_corrected`, automatic attempt failed on the mirror reflection) vs the instrument's own 114.6°, OCP and Tafel results (i_corr 7.82 µA/cm² vs synthetic truth 8). No horizontal overflow at 1024 px.
+Loaded from the UI and checked in the browser: inputs, source frame with attribution, WETCOR overlay, 111.2° (L 112.6°, R 109.9°, `manual_corrected`, automatic attempt failed on the mirror reflection) vs the instrument's own 114.6°, OCP and Tafel results (i_corr 7.82 µA/cm² vs synthetic truth 8; with `ca-2.0.0` the manual baseline now gives 113.5°). No horizontal overflow at 1024 px.
 
 ## Hosted static demo
 Built with `NEXT_PUBLIC_STATIC_DEMO=1` and served with the backend stopped: `/` -> 307 `/showcase`; showcase renders (111.2 deg, both images, both plots, report link) with zero requests to the API; `/corrosion` shows the local-backend notice; bundled report opens. Not yet deployed on Netlify itself (Netlify's Next.js runtime build not exercised).
@@ -44,7 +46,14 @@ Built with `NEXT_PUBLIC_STATIC_DEMO=1` and served with the backend stopped: `/` 
 `NETLIFY=true npm run build` (no other variable) produces `frontend/out` (plain HTML/CSS/JS); served with a static server with Netlify-style pretty URLs: `/`, `/showcase` and the snapshot return 200, the showcase renders (111.2 deg, 2 images, 2 plots, CSS applied), `/corrosion` shows the local-backend notice, unknown paths return the 404 page. Local (non-static) build unchanged; arbitrary record IDs (`/wettability/5` etc.) still render.
 
 ## In-browser engine (hosted site)
-* Wettability + electrochemistry suites run **inside Pyodide 314.0.7 under Node** (OpenCV 4.11, SciPy 1.18, pandas 3.0.2): 55 passed, 0 failed; dispatcher on the showcase files gave 111.23 deg and i_corr 7.824 uA/cm2, identical to the server.
+* Wettability + electrochemistry suites run **inside Pyodide 314.0.7 under Node** (OpenCV 4.11, SciPy 1.18, pandas 3.0.2): 56 passed, 0 failed; dispatcher on the showcase files gave 113.54 deg (server 113.52) and i_corr 7.824 uA/cm2. On the hardest transparent-drop photo the OpenCV builds differ more: 122.7 deg in the browser, 130.0 deg on the server, published 129.2 deg.
 * Exported site served by a static server, in a real browser: engine loads (~15 s first time), uploads of 65 deg and 112 deg droplets -> 65.0 deg hydrophilic / 112.1 deg hydrophobic in ~0.3 s; polarisation file -> wizard demands the electrode area, auto-proposed Tafel regions flagged, confirmed regions + Fe profile -> i_corr 7.735 uA/cm2, beta_a 69.7, beta_c 128.5 mV/dec, CR 0.0897 mm/y, with plot.
 * Note: the in-app test browser refuses `importScripts` from a CDN inside workers, so the engine uses an ES-module worker (`import` of `pyodide.mjs`), which loaded fine.
 * Not verified: a real Netlify deploy; camera capture on the hosted site (browser pane blocks the camera).
+
+## Arduino rig and detector `ca-2.0.0` (2026-10-31)
+Exported site served by a static server, in the in-app browser with the engine running in a worker:
+* Corrosion Lab, Arduino tab, the real test output (*Use example test*): verdict HEALTHY ELECTRODE, WETCOR check agrees, 145.0 and 153.0 mA, the 9.0 mA difference reported as below the 26.4 mA resolution, ACS712-05B identified. With an illustrative 12.5 cm² and Fe: 12,240 µA/cm², Faraday estimate 141.9 mm/y (range 89.3 to 195), 3.826 g/day, flagged as far above natural corrosion currents.
+* Wettability Lab, transparent drop on rough sand (published 129.2 deg) uploaded: status ok, 122.7 deg, hydrophobic, overlay drawn. This run found and fixed a defect: the page always sends the default fit method, which overrode the circle fit for traced outlines.
+* Detector accuracy: docs/CONTACT_ANGLE_EVALUATION.md.
+

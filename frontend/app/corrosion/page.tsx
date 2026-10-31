@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Plot } from "@/components/Plot";
 import { EngineBanner } from "@/components/EngineBanner";
 import { QuickAnalysis } from "@/components/QuickAnalysis";
+import { RigPanel } from "@/components/RigPanel";
 import { SpecimenPicker } from "@/components/SpecimenPicker";
 import { Alert, Badge, Button, Card, EmptyState, Field, LabeledInput, PageHeader, Select, Table, Textarea, cx } from "@/components/ui";
 import { useApi } from "@/hooks/useApi";
@@ -38,6 +39,7 @@ export default function CorrosionPage() {
   const hosted = isStaticDemo();
   const runs = useApi<CorrosionRun[]>(hosted ? null : "/api/corrosion/runs?limit=20");
   const [quickKey, setQuickKey] = useState(0);
+  const [mode, setMode] = useState<"rig" | "file">("rig");
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [pv, setPv] = useState<Preview | null>(null);
@@ -133,9 +135,17 @@ export default function CorrosionPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Instrument · Potentiostat import" title="Corrosion Lab" subtitle={hosted ? "Drop a potentiostat export (CSV, TSV, TXT), map columns and units, and get the corrosion parameters calculated in your browser — OCP, LPR, polarisation (Tafel) or EIS." : "Import potentiostat exports (CSV, TSV, TXT), map columns and units explicitly, then analyse OCP, LPR, polarisation or EIS data."}
-        actions={<Badge tone={state[1] as "neutral"}>{state[0]}</Badge>} />
+      <PageHeader eyebrow="Instrument · Potentiostat import" title="Corrosion Lab" subtitle="Paste your Arduino rig output or type the values, or upload a potentiostat export, and get the corrosion assessment with every assumption shown."
+        actions={mode === "file" ? <Badge tone={state[1] as "neutral"}>{state[0]}</Badge> : undefined} />
       <EngineBanner />
+      <div role="tablist" aria-label="Data source" className="mb-5 flex gap-1 border-b border-line print:hidden">
+        {([["rig", "Arduino rig: paste or type values"], ["file", "Potentiostat file upload"]] as const).map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+            className={cx("-mb-px border-b-2 px-4 py-2 text-sm", mode === k ? "border-accent font-semibold text-accent" : "border-transparent text-ink-2 hover:text-ink")}>{label}</button>
+        ))}
+      </div>
+      {mode === "rig" && <RigPanel />}
+      <div className={mode === "file" ? "" : "hidden"}>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <Card title="1 · Measurement file">
@@ -287,6 +297,7 @@ export default function CorrosionPage() {
       {hosted && quickKey > 0 && file && method && (
         <QuickAnalysis key={quickKey} input={{ file, method, mapping, units, imag, anodicNeg, area, reference: ref }} />
       )}
+      </div>
     </>
   );
 }

@@ -16,7 +16,7 @@ Logs: `.run\backend.log`, `.run\backend.err.log`, `.run\frontend.log`, `.run\fro
 | **"Camera API unavailable"** | Open `http://localhost:3100` (not a file path, not a LAN IP); use current Chrome/Edge/Firefox. |
 | **Backend not responding / red status dot** | Is `run-local.ps1` running? Open `http://127.0.0.1:8100/api/health`. Read `.run\backend.err.log`. |
 | **CORS / "Failed to fetch"** | Frontend must be opened on the port given to `run-local.ps1`; the backend allows only `localhost`/`127.0.0.1` at that port. Do not open the page from another computer. |
-| **Contact-angle analysis fails** | Read the error: no baseline → widen ROI so the specimen surface shows on both sides, or drag the baseline handles; clipped droplet → move camera/ROI; low contrast → improve back-lighting, set threshold manually, or use *Manual tangent* mode. |
+| **Contact-angle analysis fails** | The engine already tries several ways to find the drop and the surface. Read the error: nothing found → use a side-on image with the drop and surface in view, crop to one drop with the ROI, or drag the baseline onto the surface; clipped droplet → move camera/ROI; low contrast → improve back-lighting, set threshold manually, or use *Manual tangent* mode. |
 | **Malformed potentiostat export** | Preview shows the parsed block; export as CSV/TXT from the instrument software. Binary formats (.mpr, .ids, .nox) are not read. |
 | **Unknown column names** | Map the columns manually in step 3; every role can be assigned to any column. |
 | **Missing units** | Pick the unit beside each mapped column; import is refused until every mapped column has one. Check the instrument manual for current units (A vs mA vs µA). |
